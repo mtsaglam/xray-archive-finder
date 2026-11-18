@@ -1,0 +1,756 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>X-ray Archive Finder</title>
+<!--API_BASE-->
+<script type="module">
+import A from "https://cdn.jsdelivr.net/npm/aladin-lite@3.8.2/dist/aladin.js";
+window.A = A;
+</script>
+<style>
+:root {
+  --bg: #f6f7f9; --card: #ffffff; --ink: #1b2430; --muted: #5e6b7a; --line: #e2e6eb;
+  --accent: #1f5fae; --accent-ink: #ffffff; --soft: #eef3fa; --ok: #1e7a46; --warn: #a15c00; --bad: #b3261e;
+  --zero: #9aa5b1;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not(.embedded) {
+    --bg: #12161c; --card: #1a2029; --ink: #e6eaef; --muted: #9aa6b4; --line: #2b3440;
+    --accent: #6ea8ff; --accent-ink: #0b1220; --soft: #1f2a3a; --ok: #5fcf8f; --warn: #f0b45a; --bad: #ff8a80;
+    --zero: #5b6672;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink);
+  font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+.embedded body { background: transparent; }
+a { color: var(--accent); }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 24px 16px 60px; }
+.embedded .wrap { padding: 0 0 8px; }
+.embedded header { display: none; }
+header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+header h1 { margin: 0; font-size: 26px; letter-spacing: -.01em; }
+header p { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+.lang { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; flex: none; }
+.lang button { border: 0; border-radius: 0; padding: 4px 10px; font-size: 13px; background: var(--card); color: var(--muted); }
+.lang button.on { background: var(--accent); color: var(--accent-ink); }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px; margin-top: 16px; }
+.embedded .card:first-of-type { margin-top: 0; }
+.card h2 { margin: 0 0 12px; font-size: 17px; }
+.search { display: flex; gap: 8px; flex-wrap: wrap; }
+.search input[type=text] { flex: 1 1 320px; min-width: 0; padding: 11px 13px; font-size: 16px; border-radius: 9px;
+  border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
+.search input[type=text]:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+button { font: inherit; cursor: pointer; border-radius: 9px; border: 1px solid var(--line); background: var(--card); color: var(--ink); padding: 8px 12px; }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); padding: 10px 22px; font-weight: 600; }
+button:disabled { opacity: .55; cursor: default; }
+.opts { display: flex; flex-wrap: wrap; gap: 10px 22px; margin-top: 12px; color: var(--muted); font-size: 14px; align-items: center; }
+.opts label { display: inline-flex; gap: 6px; align-items: center; }
+.opts input[type=number] { width: 72px; padding: 4px 6px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.chip { font-size: 13px; padding: 3px 10px; border-radius: 999px; background: var(--soft); border: 1px solid var(--line); cursor: pointer; color: var(--ink); }
+.muted { color: var(--muted); }
+.err { color: var(--bad); }
+.src-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px 20px; }
+.kv .k { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.kv .v { font-size: 15px; font-variant-numeric: tabular-nums; word-break: break-word; }
+.big { font-size: 20px; font-weight: 650; }
+details.aliases { margin-top: 12px; }
+details.aliases summary { cursor: pointer; color: var(--accent); }
+.alias-list { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; max-height: 220px; overflow: auto; }
+.alias-list span { font-size: 12.5px; padding: 2px 8px; border-radius: 6px; background: var(--soft); }
+.total { display: flex; gap: 28px; flex-wrap: wrap; margin-bottom: 12px; }
+.total .n { font-size: 30px; font-weight: 700; line-height: 1.1; }
+.total .l { color: var(--muted); font-size: 13px; }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; margin: 0; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 600; }
+td.num, th.num { text-align: right; }
+tr.mrow { cursor: pointer; }
+tr.mrow:hover td { background: var(--soft); }
+tr.mrow.zero td { color: var(--zero); }
+tr.mrow.zero { cursor: default; }
+tr.mrow .count { font-weight: 700; font-size: 16px; }
+tr.mrow .caret { display: inline-block; width: 14px; color: var(--muted); transition: transform .15s; }
+tr.mrow.open .caret { transform: rotate(90deg); }
+.dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 7px; vertical-align: 1px; }
+tr.detail > td { padding: 0 0 12px 24px; background: var(--bg); white-space: normal; }
+tr.detail table { font-size: 13px; }
+tr.detail th, tr.detail td { padding: 5px 8px; }
+.badge { font-size: 11.5px; padding: 1px 7px; border-radius: 999px; border: 1px solid currentColor; }
+.b-ok { color: var(--ok); } .b-warn { color: var(--warn); } .b-plan { color: var(--muted); }
+.spin { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: s .8s linear infinite; vertical-align: -2px; }
+@keyframes s { to { transform: rotate(360deg); } }
+.toolbar { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.surveys { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-top: 14px; }
+.survey { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+.two { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 16px; }
+@media (max-width: 860px) { .two { grid-template-columns: 1fr; } }
+#aladin { width: 100%; height: 460px; border-radius: 10px; overflow: hidden; border: 1px solid var(--line); background: #000; }
+.mapctl { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-bottom: 10px; font-size: 14px; align-items: center; }
+.mapctl select { padding: 5px 6px; border-radius: 7px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); max-width: 100%; }
+.spec { margin-bottom: 14px; }
+.spec img { width: 100%; border-radius: 8px; border: 1px solid var(--line); background: #fff; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12.5px; margin-top: 8px; color: var(--muted); }
+.note { font-size: 13px; margin: 10px 0 0; }
+footer { margin-top: 28px; color: var(--muted); font-size: 12.5px; }
+.hidden { display: none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1 data-i18n="title"></h1>
+      <p data-i18n="subtitle"></p>
+    </div>
+  </header>
+
+  <section class="card">
+    <form class="search" id="form" autocomplete="off">
+      <input type="text" id="q" data-i18n-ph="placeholder" aria-label="Source">
+      <button class="primary" id="go" type="submit" data-i18n="search"></button>
+    </form>
+    <div class="opts">
+      <span data-i18n="radius"></span>
+      <label><input type="radio" name="rmode" value="auto" checked> <span data-i18n="radiusAuto"></span></label>
+      <label><input type="radio" name="rmode" value="fixed"> <span data-i18n="radiusFixed"></span>
+        <input type="number" id="radius" value="5" min="0.1" max="600" step="0.5"> <span data-i18n="arcmin"></span></label>
+      <span class="lang" style="margin-left:auto"><button type="button" data-lang="en">EN</button><button type="button" data-lang="tr">TR</button></span>
+    </div>
+    <div class="chips" id="examples"></div>
+  </section>
+
+  <div id="status" class="card hidden"></div>
+
+  <section id="source" class="card hidden"></section>
+
+  <section id="results" class="card hidden">
+    <div class="toolbar">
+      <h2 style="margin:0" data-i18n="obsTitle"></h2>
+      <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+        <label class="muted" style="font-size:14px"><input type="checkbox" id="hideZero"> <span data-i18n="hideZero"></span></label>
+        <button id="csv" disabled data-i18n="csv"></button>
+      </div>
+    </div>
+    <div class="total" id="total"></div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr>
+          <th data-i18n="thMission"></th><th class="num" data-i18n="thObs"></th><th class="num" data-i18n="thPlanned"></th>
+          <th class="num" data-i18n="thProp"></th><th class="num" data-i18n="thExpo"></th><th data-i18n="thRange"></th>
+          <th class="num" data-i18n="thRadius"></th>
+        </tr></thead>
+        <tbody id="mtable"></tbody>
+      </table>
+    </div>
+    <p class="muted note" data-i18n="tableNote"></p>
+    <div class="surveys" id="surveys"></div>
+  </section>
+
+  <div class="two hidden" id="extras">
+    <section class="card">
+      <h2 data-i18n="fieldTitle"></h2>
+      <div class="mapctl">
+        <label><span data-i18n="base"></span> <select id="base"></select></label>
+        <label><span data-i18n="overlay"></span> <select id="overlay"></select></label>
+        <label><span data-i18n="opacity"></span> <input type="range" id="opacity" min="0" max="100" value="50"></label>
+        <label><input type="checkbox" id="showPts" checked> <span data-i18n="points"></span></label>
+      </div>
+      <div id="aladin"></div>
+      <div class="legend" id="legend"></div>
+      <p class="muted note" data-i18n="mapNote"></p>
+    </section>
+    <section class="card">
+      <h2 data-i18n="sdssTitle"></h2>
+      <div id="sdss" class="muted">—</div>
+    </section>
+  </div>
+
+  <footer data-i18n="footer"></footer>
+</div>
+
+<script>
+"use strict";
+const API = (window.XRAY_API_BASE || "") + "api/";
+const COLORS = ["#e6194b","#3cb44b","#4363d8","#f58231","#911eb4","#42d4f4","#f032e6","#bfef45","#fabed4",
+  "#469990","#dcbeff","#9a6324","#fffac8","#800000","#aaffc3","#808000","#ffd8b1","#000075"];
+const EXAMPLES = ["Cyg X-1", "Mrk 421", "Sgr A*", "4U 1820-30", "Crab", "Ton 618", "19 58 21.67 +35 12 05.7"];
+
+const I18N = {
+  en: {
+    title: "X-ray Archive Finder",
+    subtitle: "Finds how many observations a source has with each X-ray mission, from the NASA HEASARC archive. Names are resolved with SIMBAD.",
+    placeholder: "Source name (Cyg X-1, Mrk 421, 4U 1820-30…) or coordinates (19 58 21.7 +35 12 06 / 299.59 35.20)",
+    search: "Search", radius: "Search radius:", radiusAuto: "Automatic (each mission's field of view)",
+    radiusFixed: "Fixed", arcmin: "arcmin",
+    coordTitle: "Coordinates: ", query: "query", resolver: "resolved by", simbadPage: "SIMBAD page",
+    nearest: "Nearest SIMBAD object", noneWithin: "none within 10″", allNames: "All names",
+    galactic: "Galactic l, b",
+    obsTitle: "X-ray observations", hideZero: "Hide missions without observations", csv: "Download CSV",
+    thMission: "Mission", thObs: "Observations", thPlanned: "Planned / not done", thProp: "Still proprietary",
+    thExpo: "Total exposure (ks)", thRange: "First – last", thRadius: "Radius (′)",
+    totObs: "observations", totMissions: "missions", totExpo: "total exposure (Ms)", pending: (n) => `${n} missions pending…`,
+    tableNote: "Click a row to list its observations. “Observations” counts performed ones (archived, processing or still proprietary) whose pointing centre lies within the radius; use the offset column to spot off-axis pointings. For INTEGRAL the radius is 5° (IBIS field of view) and the count is per observation ID, with the number of science windows (ScW) shown below.",
+    retry: "Error ↻",
+    dId: "ObsID", dTarget: "Target", dDate: "Date", dExpo: "Exposure (ks)", dOff: "Offset (′)", dStatus: "Status",
+    planned: "planned", proprietary: "proprietary →", archived: "archived",
+    firstN: (n, t) => `Showing the first ${n} of ${t} observations; download the CSV for all of them.`,
+    covered: "✔ Covered", notCovered: "✘ Not covered", fields: "field",
+    outside_dr1: "eRASS1 DR1 only covers the half of the sky with Galactic longitude 180° < l < 360° (German consortium).",
+    fieldTitle: "Field image", base: "Image", overlay: "Overlay", opacity: "Opacity", points: "Pointings", none: "— none —",
+    groups: {opt: "Optical", x: "X-ray", radio: "Radio"}, color: "color",
+    mapNote: "Markers show observation pointing centres (toggle layers from the menu at the top left of the map). Aladin Lite / HiPS.",
+    aladinFail: "Aladin Lite could not be loaded",
+    sdssTitle: "SDSS optical spectrum", sdssSearching: "Searching SDSS DR17…",
+    sdssNone: "No SDSS DR17 spectrum within 3″ of this position.", sdssErr: "SDSS error: ",
+    resolving: (q) => `Resolving “${q}”…`, notFound: "Source not found: ",
+    waking: "Waking up the server (free hosting sleeps when idle, this can take up to a minute)…",
+    noServer: "Could not reach the server: ", radiusErr: "Radius must be between 0 and 600 arcmin.",
+    expoNote: {duration: "duration"},
+    footer: "Data: NASA HEASARC (TAP), SIMBAD (CDS / CfA mirror), SDSS DR17 SkyServer, HiPS surveys via Aladin Lite.",
+    locale: "en-US",
+  },
+  tr: {
+    title: "X-ray Arşiv Bulucu",
+    subtitle: "Bir kaynağın hangi X-ray uydularında kaç gözlemi olduğunu NASA HEASARC arşivinden bulur. İsim çözümleme: SIMBAD.",
+    placeholder: "Kaynak adı (Cyg X-1, Mrk 421, 4U 1820-30…) veya koordinat (19 58 21.7 +35 12 06 / 299.59 35.20)",
+    search: "Ara", radius: "Arama yarıçapı:", radiusAuto: "Otomatik (her uydunun görüş alanı)",
+    radiusFixed: "Sabit", arcmin: "yay dakikası",
+    coordTitle: "Koordinat: ", query: "sorgu", resolver: "çözümleyen", simbadPage: "SIMBAD sayfası",
+    nearest: "En yakın SIMBAD nesnesi", noneWithin: "10″ içinde yok", allNames: "Tüm adlar",
+    galactic: "Galaktik l, b",
+    obsTitle: "X-ray gözlemleri", hideZero: "Gözlemi olmayanları gizle", csv: "CSV indir",
+    thMission: "Uydu", thObs: "Gözlem", thPlanned: "Planlı / yapılmamış", thProp: "Henüz özel",
+    thExpo: "Toplam pozlama (ks)", thRange: "İlk – son gözlem", thRadius: "Yarıçap (′)",
+    totObs: "toplam gözlem", totMissions: "uydu / görev", totExpo: "toplam pozlama (Ms)", pending: (n) => `${n} görev sorgulanıyor…`,
+    tableNote: "Satıra tıklayınca gözlem listesi açılır. “Gözlem” = yapılmış gözlemler (arşivde, işleniyor veya henüz özel); yönelim merkezi (pointing) yarıçap içinde olanlar sayılır, ofset sütunu ile eksen dışı gözlemleri ayırt edebilirsiniz. INTEGRAL için yarıçap 5° (IBIS görüş alanı) ve sayı gözlem (obs_id) başınadır; bilim penceresi (ScW) sayısı altında verilir.",
+    retry: "Hata ↻",
+    dId: "ObsID", dTarget: "Hedef adı", dDate: "Tarih", dExpo: "Pozlama (ks)", dOff: "Ofset (′)", dStatus: "Durum",
+    planned: "planlı", proprietary: "özel →", archived: "arşivde",
+    firstN: (n, t) => `İlk ${n} gözlem gösteriliyor (toplam ${t}); tamamı için CSV indirin.`,
+    covered: "✔ Kapsıyor", notCovered: "✘ Kapsamıyor", fields: "alan",
+    outside_dr1: "eRASS1 DR1 yalnızca Galaktik boylamı 180° < l < 360° olan yarıküreyi (Alman konsorsiyumu) içerir.",
+    fieldTitle: "Alan görüntüsü", base: "Görüntü", overlay: "Üst katman", opacity: "Opaklık", points: "Gözlem noktaları", none: "— yok —",
+    groups: {opt: "Optik", x: "X-ray", radio: "Radyo"}, color: "renkli",
+    mapNote: "Noktalar gözlemlerin yönelim merkezleridir (katmanlar haritanın sol üstündeki menüden açılıp kapatılabilir). Aladin Lite / HiPS.",
+    aladinFail: "Aladin Lite yüklenemedi",
+    sdssTitle: "SDSS optik spektrumu", sdssSearching: "SDSS DR17 aranıyor…",
+    sdssNone: "Bu konumda (3″ içinde) SDSS DR17 spektrumu yok.", sdssErr: "SDSS hatası: ",
+    resolving: (q) => `“${q}” çözümleniyor…`, notFound: "Kaynak bulunamadı: ",
+    waking: "Sunucu uyandırılıyor (ücretsiz sunucu boşta uyur, bir dakika kadar sürebilir)…",
+    noServer: "Sunucuya bağlanılamadı: ", radiusErr: "Yarıçap 0–600 yay dakikası olmalı.",
+    expoNote: {duration: "süre"},
+    footer: "Veri: NASA HEASARC (TAP), SIMBAD (CDS / CfA aynası), SDSS DR17 SkyServer, Aladin Lite ile HiPS haritaları.",
+    locale: "tr-TR",
+  },
+};
+
+// [HiPS ID, label (color word replaced per language), group, mirror URLs]. First answering mirror wins; else Aladin resolves the ID via CDS.
+const HIPS = [
+  ["CDS/P/DSS2/color", "DSS2 %c", "opt", ["https://irsa.ipac.caltech.edu/data/hips/CDS/DSS2/color", "https://skies.esac.esa.int/DSSColor", "https://hips.china-vo.org/m/CDS_P_DSS2_color"]],
+  ["CDS/P/PanSTARRS/DR1/color-i-r-g", "Pan-STARRS DR1 %c", "opt", ["https://stpubdata.s3.us-east-1.amazonaws.com/mast/skybackgrounds/PanSTARRS"]],
+  ["CDS/P/SDSS9/color", "SDSS9 %c", "opt", ["https://irsa.ipac.caltech.edu/data/hips/CDS/SDSS/DR9/color", "https://skies.esac.esa.int/SDSS9Color", "https://hips.china-vo.org/m/CDS_P_SDSS9_color"]],
+  ["CDS/P/2MASS/color", "2MASS (NIR) %c", "opt", ["https://irsa.ipac.caltech.edu/data/hips/CDS/2MASS/Color", "https://hips.china-vo.org/m/CDS_P_2MASS_color"]],
+  ["ESDC/P/XMM/EPIC-RGB", "XMM-Newton EPIC RGB", "x", ["https://esdchips.esac.esa.int/XMM-Newton/EPIC-RGB"]],
+  ["cxc.harvard.edu/P/cda/hips/allsky/rgb", "Chandra RGB", "x", ["https://cdaftp.cfa.harvard.edu/cxc-hips"]],
+  ["erosita/dr1/rate/rgb", "eROSITA DR1 RGB", "x", ["https://erosita.mpe.mpg.de/erodat/static/hips/eRASS1_RGB_Rate_c010"]],
+  ["ov-gso/P/RASS", "ROSAT All-Sky Survey", "x", []],
+  ["CDS/P/NVSS", "NVSS 1.4 GHz", "radio", ["https://hips.china-vo.org/m/CDS_P_NVSS"]],
+  ["NRAO/P/VLASS-Quicklook-MedianStack", "VLASS 3 GHz", "radio", ["https://vlass-dl.nrao.edu/vlass/HiPS/MedianStack/Quicklook"]],
+  ["CSIRO/P/RACS/mid/I", "RACS-mid 1.37 GHz", "radio", ["https://casda.csiro.au/hips/RACS/mid/I"]],
+  ["CDS/P/SUMSS", "SUMSS 843 MHz", "radio", []],
+];
+const HIPS_BY_ID = Object.fromEntries(HIPS.map((h) => [h[0], h]));
+const hipsCache = {};
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let lang = "en";
+const t = (k) => I18N[lang][k];
+const fmt = (x, d = 1) => (x == null ? "—" : Number(x).toLocaleString(t("locale"), {minimumFractionDigits: d, maximumFractionDigits: d}));
+const fmtInt = (x) => Number(x).toLocaleString(t("locale"));
+const hipsLabel = (id) => HIPS_BY_ID[id][1].replace("%c", t("color"));
+
+let MISSIONS = [], SURVEYS = [];
+let state = null;
+let searchSeq = 0;
+let aladin = null, aladinReady = null, pointCats = [];
+
+// ---------------------------------------------------------------- language / embedding
+function pickLang() {
+  const p = new URLSearchParams(location.search).get("lang");
+  if (p && I18N[p]) return p;
+  try { const s = localStorage.getItem("xray-finder-lang"); if (s && I18N[s]) return s; } catch (e) { /* no storage */ }
+  return (navigator.language || "").toLowerCase().startsWith("tr") ? "tr" : "en";
+}
+
+function applyStatic() {
+  document.documentElement.lang = lang;
+  document.title = t("title");
+  document.querySelectorAll("[data-i18n]").forEach((el) => { el.textContent = t(el.dataset.i18n); });
+  document.querySelectorAll("[data-i18n-ph]").forEach((el) => { el.placeholder = t(el.dataset.i18nPh); });
+  document.querySelectorAll(".lang button").forEach((b) => b.classList.toggle("on", b.dataset.lang === lang));
+  buildMapSelects();
+}
+
+function setLang(l) {
+  lang = l;
+  try { localStorage.setItem("xray-finder-lang", l); } catch (e) { /* no storage */ }
+  applyStatic();
+  if (!state) return;
+  renderSource(state.src);
+  MISSIONS.forEach((m) => {
+    const det = $("det-" + m.key);
+    const wasOpen = !det.classList.contains("hidden");
+    delete det.dataset.filled; det.classList.add("hidden"); $("row-" + m.key).classList.remove("open");
+    if (state.results[m.key]) renderRow(m.key);
+    if (wasOpen) toggleDetail(m.key);
+  });
+  renderTotal();
+  renderSurveys();
+  renderSdss();
+}
+
+if (window.self !== window.top) {
+  document.documentElement.classList.add("embedded");
+  const post = () => parent.postMessage({type: "xray-finder-height", height: document.documentElement.scrollHeight}, "*");
+  new ResizeObserver(post).observe(document.body);
+  window.addEventListener("load", post);
+}
+
+// ---------------------------------------------------------------- utils
+async function getJSON(url) {
+  const r = await fetch(url);
+  let body = null;
+  try { body = await r.json(); } catch (e) { /* non-JSON */ }
+  if (!r.ok) { const err = new Error((body && body.error) || ("HTTP " + r.status)); err.status = r.status; throw err; }
+  return body;
+}
+
+async function pool(items, limit, fn) {
+  let i = 0;
+  const workers = Array.from({length: Math.min(limit, items.length)}, async () => {
+    while (i < items.length) { const it = items[i++]; await fn(it); }
+  });
+  await Promise.all(workers);
+}
+
+function showStatus(html, isErr) {
+  const el = $("status");
+  el.innerHTML = html;
+  el.classList.toggle("hidden", !html);
+  el.classList.toggle("err", !!isErr);
+}
+
+// ---------------------------------------------------------------- source card
+function renderSource(s) {
+  const el = $("source");
+  const title = s.main_id ? esc(s.main_id) : t("coordTitle") + esc(s.query);
+  let near = "";
+  if (s.input_type === "coord") {
+    near = `<div class="kv"><div class="k">${t("nearest")}</div><div class="v">` + (s.nearest
+      ? `${esc(s.nearest.main_id)} (${esc(s.nearest.otype)}, ${fmt(s.nearest.sep_arcsec, 1)}″)`
+      : `<span class="muted">${t("noneWithin")}</span>`) + `</div></div>`;
+  }
+  const aliases = s.aliases && s.aliases.length ? s.aliases : (s.nearest && s.nearest.aliases) || [];
+  const showQuery = s.query && s.main_id && s.query.toLowerCase() !== s.main_id.toLowerCase();
+  el.innerHTML = `
+    <div class="big">${title}</div>
+    <div class="muted" style="margin-bottom:12px">${esc(s.otype || "")}${showQuery ? ` · ${t("query")}: ${esc(s.query)}` : ""}
+      · ${t("resolver")}: ${esc(s.resolver)}${s.simbad_url ? ` · <a href="${esc(s.simbad_url)}" target="_blank" rel="noopener">${t("simbadPage")}</a>` : ""}</div>
+    <div class="src-grid">
+      <div class="kv"><div class="k">RA (J2000)</div><div class="v">${esc(s.ra_hms)}<br><span class="muted">${s.ra.toFixed(5)}°</span></div></div>
+      <div class="kv"><div class="k">Dec (J2000)</div><div class="v">${esc(s.dec_dms)}<br><span class="muted">${s.dec.toFixed(5)}°</span></div></div>
+      <div class="kv"><div class="k">${t("galactic")}</div><div class="v">${s.l.toFixed(3)}°, ${s.b.toFixed(3)}°</div></div>
+      ${near}
+    </div>
+    ${aliases.length ? `<details class="aliases"><summary>${t("allNames")} (${aliases.length})</summary>
+      <div class="alias-list">${aliases.map((a) => `<span>${esc(a)}</span>`).join("")}</div></details>` : ""}`;
+  el.classList.remove("hidden");
+}
+
+// ---------------------------------------------------------------- mission table
+function buildTable() {
+  const tb = $("mtable");
+  tb.innerHTML = "";
+  MISSIONS.forEach((m, idx) => {
+    const tr = document.createElement("tr");
+    tr.className = "mrow";
+    tr.id = "row-" + m.key;
+    tr.innerHTML = `<td><span class="caret">▸</span><span class="dot" style="background:${COLORS[idx % COLORS.length]}"></span>${esc(m.label)}</td>
+      <td class="num"><span class="spin"></span></td><td class="num"></td><td class="num"></td><td class="num"></td><td></td><td class="num"></td>`;
+    tr.addEventListener("click", () => toggleDetail(m.key));
+    const dt = document.createElement("tr");
+    dt.className = "detail hidden";
+    dt.id = "det-" + m.key;
+    dt.innerHTML = `<td colspan="7"></td>`;
+    tb.append(tr, dt);
+  });
+}
+
+function renderRow(key) {
+  const res = state.results[key];
+  const tr = $("row-" + key);
+  const cells = tr.querySelectorAll("td");
+  if (res.error) {
+    tr.classList.add("zero");
+    cells[1].innerHTML = `<button class="retry" title="${esc(res.error)}">${t("retry")}</button>`;
+    cells[1].querySelector("button").addEventListener("click", (e) => { e.stopPropagation(); runMission(key, state.id); });
+    for (let i = 2; i < 7; i++) cells[i].textContent = "";
+    return;
+  }
+  const n = res.n_done;
+  tr.classList.toggle("zero", n === 0 && res.n_planned === 0);
+  const note = res.expo_note ? (t("expoNote")[res.expo_note] || res.expo_note) : "";
+  cells[1].innerHTML = `<span class="count">${fmtInt(n)}</span>` +
+    (res.n_scw ? `<div class="muted" style="font-size:12px">${fmtInt(res.n_scw)} ScW</div>` : "");
+  cells[2].textContent = res.n_planned ? fmtInt(res.n_planned) : "";
+  cells[3].textContent = res.n_proprietary ? fmtInt(res.n_proprietary) : "";
+  cells[4].innerHTML = n ? fmt(res.exposure_ks, 1) + (note ? ` <span class="muted" style="font-size:12px">${esc(note)}</span>` : "") : "";
+  cells[5].textContent = res.first ? (res.first === res.last ? res.first : res.first + " – " + res.last) : "";
+  const r = res.radius_arcmin;
+  cells[6].textContent = r >= 60 ? fmt(r / 60, r % 60 ? 1 : 0) + "°" : fmt(r, r % 1 ? 1 : 0);
+  applyHideZero();
+}
+
+function toggleDetail(key) {
+  const res = state && state.results[key];
+  if (!res || res.error || !res.observations.length) return;
+  const tr = $("row-" + key), dt = $("det-" + key);
+  const open = dt.classList.contains("hidden");
+  if (open && !dt.dataset.filled) {
+    const LIM = 1000;
+    const obs = res.observations;
+    const extraKeys = [...new Set(obs.flatMap((o) => Object.keys(o.extra || {})))];
+    const rows = obs.slice(0, LIM).map((o) => {
+      const badge = !o.done ? `<span class="badge b-plan">${esc(o.status || t("planned"))}</span>`
+        : o.proprietary ? `<span class="badge b-warn">${t("proprietary")} ${esc(o.public_date)}</span>`
+        : `<span class="badge b-ok">${esc(o.status || t("archived"))}</span>`;
+      const id = o.link ? `<a href="${esc(o.link)}" target="_blank" rel="noopener">${esc(o.id)}</a>` : esc(o.id);
+      return `<tr><td>${id}</td><td>${esc(o.name)}</td><td>${esc(o.date || "—")}</td>
+        <td class="num">${fmt(o.exposure_ks, 2)}</td><td class="num">${fmt(o.offset_arcmin, 2)}</td><td>${badge}</td>
+        ${extraKeys.map((k) => `<td>${esc((o.extra || {})[k] ?? "")}</td>`).join("")}</tr>`;
+    }).join("");
+    dt.firstElementChild.innerHTML = `<div class="tablewrap"><table>
+      <thead><tr><th>${t("dId")}</th><th>${t("dTarget")}</th><th>${t("dDate")}</th><th class="num">${t("dExpo")}</th>
+      <th class="num">${t("dOff")}</th><th>${t("dStatus")}</th>${extraKeys.map((k) => `<th>${esc(k)}</th>`).join("")}</tr></thead>
+      <tbody>${rows}</tbody></table></div>
+      ${obs.length > LIM ? `<p class="muted">${t("firstN")(LIM, fmtInt(obs.length))}</p>` : ""}`;
+    dt.dataset.filled = "1";
+  }
+  dt.classList.toggle("hidden", !open);
+  tr.classList.toggle("open", open);
+}
+
+function applyHideZero() {
+  const hide = $("hideZero").checked;
+  MISSIONS.forEach((m) => {
+    const res = state && state.results[m.key];
+    const zero = res && !res.error && res.n_done === 0 && res.n_planned === 0;
+    $("row-" + m.key).classList.toggle("hidden", hide && zero);
+    if (hide && zero) $("det-" + m.key).classList.add("hidden");
+  });
+}
+
+function renderTotal() {
+  const vals = Object.values(state.results).filter((r) => !r.error);
+  const withData = vals.filter((r) => r.n_done > 0);
+  const total = withData.reduce((a, r) => a + r.n_done, 0);
+  const expo = withData.reduce((a, r) => a + (r.exposure_ks || 0), 0);
+  const pending = MISSIONS.length - Object.keys(state.results).length;
+  $("total").innerHTML = `
+    <div><div class="n">${fmtInt(total)}</div><div class="l">${t("totObs")}</div></div>
+    <div><div class="n">${withData.length}</div><div class="l">${t("totMissions")}</div></div>
+    <div><div class="n">${fmt(expo / 1000, 2)}</div><div class="l">${t("totExpo")}</div></div>
+    ${pending ? `<div><div class="n"><span class="spin"></span></div><div class="l">${t("pending")(pending)}</div></div>` : ""}`;
+  $("csv").disabled = !!pending || total === 0;
+}
+
+async function runMission(key, sid) {
+  const row = $("row-" + key);
+  row.querySelectorAll("td")[1].innerHTML = `<span class="spin"></span>`;
+  delete state.results[key];
+  const det = $("det-" + key);
+  det.classList.add("hidden"); delete det.dataset.filled; row.classList.remove("open");
+  renderTotal();
+  let url = `${API}mission/${key}?ra=${state.src.ra}&dec=${state.src.dec}`;
+  if (state.radius) url += `&radius=${state.radius}`;
+  let res;
+  try { res = await getJSON(url); } catch (e) { res = {key, error: e.message}; }
+  if (sid !== searchSeq) return;
+  state.results[key] = res;
+  renderRow(key);
+  renderTotal();
+  if (!res.error) plotPointings(key, res);
+}
+
+// ---------------------------------------------------------------- surveys / sdss
+function renderSurveys() {
+  $("surveys").innerHTML = SURVEYS.map((s) => {
+    const r = state.surveys[s.key];
+    let body = `<span class="spin"></span>`;
+    if (r && r.error) body = `<span class="err">${esc(r.error)}</span>`;
+    else if (r) body = r.covered ? `<span style="color:var(--ok)">${t("covered")}</span> · ${t("fields")}: ${r.fields.map(esc).join(", ")}`
+      : `${t("notCovered")}${r.note ? `<div style="font-size:12.5px">${esc(t(r.note) || r.note)}</div>` : ""}`;
+    return `<div class="survey"><b>${esc(s.label)}</b><div class="muted">${body}</div></div>`;
+  }).join("");
+}
+
+async function runSurveys(sid) {
+  renderSurveys();
+  await Promise.all(SURVEYS.map(async (s) => {
+    let r;
+    try { r = await getJSON(`${API}survey/${s.key}?ra=${state.src.ra}&dec=${state.src.dec}`); }
+    catch (e) { r = {error: e.message}; }
+    if (sid !== searchSeq) return;
+    state.surveys[s.key] = r;
+    renderSurveys();
+  }));
+}
+
+function renderSdss() {
+  const el = $("sdss");
+  const r = state.sdss;
+  el.classList.add("muted");
+  if (!r) { el.innerHTML = `<span class="spin"></span> ${t("sdssSearching")}`; return; }
+  if (r.error) { el.innerHTML = `<span class="err">${t("sdssErr")}${esc(r.error)}</span>`; return; }
+  if (!r.spectra.length) { el.textContent = t("sdssNone"); return; }
+  el.classList.remove("muted");
+  el.innerHTML = r.spectra.map((s) => `
+    <div class="spec">
+      <div style="margin-bottom:6px"><b>${esc(s.cls)}</b> ${esc(s.subclass || "")} · z = ${Number(s.z).toFixed(5)} ·
+        <span class="muted">plate-mjd-fiber ${esc(s.plate)}-${esc(s.mjd)}-${esc(s.fiberid)} · ${esc(s.survey)} · ${fmt(s.distance_arcsec, 2)}″</span></div>
+      <a href="${esc(s.explore)}" target="_blank" rel="noopener"><img src="${esc(s.image)}" alt="SDSS ${esc(s.specobjid)}"></a>
+    </div>`).join("");
+}
+
+async function runSdss(sid) {
+  renderSdss();
+  let r;
+  try { r = await getJSON(`${API}sdss?ra=${state.src.ra}&dec=${state.src.dec}`); }
+  catch (e) { r = {error: e.message}; }
+  if (sid !== searchSeq) return;
+  state.sdss = r;
+  renderSdss();
+}
+
+// ---------------------------------------------------------------- Aladin
+function buildMapSelects() {
+  const groups = t("groups");
+  const html = (withNone) => (withNone ? `<option value="">${t("none")}</option>` : "") +
+    Object.keys(groups).map((g) => `<optgroup label="${groups[g]}">` +
+      HIPS.filter((h) => h[2] === g).map((h) => `<option value="${h[0]}">${esc(hipsLabel(h[0]))}</option>`).join("") +
+      `</optgroup>`).join("");
+  for (const [id, withNone] of [["base", false], ["overlay", true]]) {
+    const sel = $(id), v = sel.value;
+    sel.innerHTML = html(withNone);
+    if (v) sel.value = v;
+  }
+}
+
+function initMapControls() {
+  $("base").addEventListener("change", setBase);
+  $("overlay").addEventListener("change", setOverlay);
+  $("showPts").addEventListener("change", () => pointCats.forEach((c) => ($("showPts").checked ? c.show() : c.hide())));
+  $("opacity").addEventListener("input", () => {
+    const layer = aladin && aladin.getOverlayImageLayer && aladin.getOverlayImageLayer("overlay");
+    if (layer) layer.setOpacity($("opacity").value / 100);
+  });
+}
+
+async function hipsSource(id) {
+  if (hipsCache[id]) return hipsCache[id];
+  for (const url of HIPS_BY_ID[id][3]) {
+    try {
+      const ctl = new AbortController();
+      const timer = setTimeout(() => ctl.abort(), 6000);
+      const r = await fetch(url + "/properties", {signal: ctl.signal});
+      clearTimeout(timer);
+      if (r.ok) return (hipsCache[id] = url);
+    } catch (e) { /* try next mirror */ }
+  }
+  return (hipsCache[id] = id);
+}
+
+async function setBase() {
+  if (!aladin) return;
+  const id = $("base").value;
+  const src = await hipsSource(id);
+  if ($("base").value === id) aladin.setBaseImageLayer(A.imageHiPS(src, {name: hipsLabel(id)}));
+}
+
+async function setOverlay() {
+  if (!aladin) return;
+  const id = $("overlay").value;
+  try { aladin.removeImageLayer("overlay"); } catch (e) { /* none yet */ }
+  if (!id) return;
+  const src = await hipsSource(id);
+  if ($("overlay").value !== id) return;
+  const layer = aladin.setOverlayImageLayer(A.imageHiPS(src, {name: hipsLabel(id)}), "overlay");
+  if (layer && layer.setOpacity) layer.setOpacity($("opacity").value / 100);
+}
+
+function waitAladin() {
+  if (aladinReady) return aladinReady;
+  aladinReady = new Promise((resolve, reject) => {
+    const start = Date.now();
+    (function poll() {
+      if (window.A && A.init) return A.init.then(resolve, reject);
+      if (Date.now() - start > 20000) return reject(new Error(t("aladinFail")));
+      setTimeout(poll, 150);
+    })();
+  });
+  return aladinReady;
+}
+
+async function showMap(src) {
+  $("extras").classList.remove("hidden");
+  try { await waitAladin(); } catch (e) { $("aladin").innerHTML = `<p style="color:#fff;padding:12px">${esc(e.message)}</p>`; return; }
+  const target = `${src.ra} ${src.dec}`;
+  if (!aladin) {
+    const base = await hipsSource($("base").value);
+    aladin = A.aladin("#aladin", {survey: base, fov: 0.6, target, showReticle: true,
+      showLayersControl: true, showFullscreenControl: true, showCooGridControl: true, showSimbadPointerControl: false,
+      showProjectionControl: false, showFrame: true, hipsList: []});
+    setOverlay();
+  } else {
+    aladin.removeLayers();
+    pointCats = [];
+    aladin.gotoRaDec(src.ra, src.dec);
+    aladin.setFoV(0.6);
+  }
+  const g = A.graphicOverlay({color: "#ffffff", lineWidth: 1.5, name: "Source"});
+  aladin.addOverlay(g);
+  g.add(A.circle(src.ra, src.dec, 10 / 3600));
+  (state.pendingPlots || []).forEach(([k, r]) => plotPointings(k, r));
+  state.pendingPlots = [];
+}
+
+function plotPointings(key, res) {
+  if (!res.observations.length) return;
+  if (!aladin) { state.pendingPlots.push([key, res]); return; }
+  const idx = MISSIONS.findIndex((m) => m.key === key);
+  const color = COLORS[idx % COLORS.length];
+  const cat = A.catalog({name: `${res.label} (${res.observations.length})`, color, sourceSize: 9, shape: "circle"});
+  aladin.addCatalog(cat);
+  pointCats.push(cat);
+  if (!$("showPts").checked) cat.hide();
+  const seen = new Set();
+  const srcs = [];
+  res.observations.forEach((o) => {
+    if (o.ra == null || o.dec == null) return;
+    const k = o.ra.toFixed(4) + "," + o.dec.toFixed(4);
+    if (seen.has(k)) return;
+    seen.add(k);
+    srcs.push(A.source(o.ra, o.dec, {ObsID: o.id, Target: o.name, Date: o.date, Exposure_ks: o.exposure_ks}));
+  });
+  cat.addSources(srcs);
+  $("legend").insertAdjacentHTML("beforeend", `<span><span class="dot" style="background:${color}"></span>${esc(res.label)}</span>`);
+}
+
+// ---------------------------------------------------------------- CSV
+function downloadCsv() {
+  const head = ["mission","obsid","target","date","mjd","exposure_ks","offset_arcmin","status","observed","proprietary","public_date","ra","dec"];
+  const q = (v) => { v = v == null ? "" : String(v); return /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v; };
+  const lines = [head.join(",")];
+  MISSIONS.forEach((m) => {
+    const r = state.results[m.key];
+    if (!r || r.error) return;
+    r.observations.forEach((o) => lines.push([r.label, o.id, o.name, o.date, o.mjd, o.exposure_ks, o.offset_arcmin, o.status, o.done, o.proprietary, o.public_date, o.ra, o.dec].map(q).join(",")));
+  });
+  const name = (state.src.main_id || state.src.query).replace(/[^\w.+-]+/g, "_");
+  const blob = new Blob([lines.join("\n")], {type: "text/csv"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `xray_obs_${name}.csv`;
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+
+// ---------------------------------------------------------------- main
+function syncUrl(q, radius) {
+  const p = new URLSearchParams(location.search);
+  p.set("q", q);
+  if (radius) p.set("r", radius); else p.delete("r");
+  history.replaceState(null, "", "?" + p.toString());
+  if (window.self !== window.top) parent.postMessage({type: "xray-finder-query", q, r: radius || null}, "*");
+}
+
+async function search(q) {
+  q = q.trim();
+  if (!q || !MISSIONS.length) return;
+  const sid = ++searchSeq;
+  const fixed = document.querySelector("input[name=rmode]:checked").value === "fixed";
+  const radius = fixed ? parseFloat($("radius").value) : null;
+  if (fixed && !(radius > 0 && radius <= 600)) { showStatus(t("radiusErr"), true); return; }
+  syncUrl(q, radius);
+  $("go").disabled = true;
+  ["source", "results"].forEach((id) => $(id).classList.add("hidden"));
+  $("legend").innerHTML = "";
+  showStatus(`<span class="spin"></span> ${esc(t("resolving")(q))}`);
+  let src;
+  try { src = await getJSON(API + "resolve?q=" + encodeURIComponent(q)); }
+  catch (e) {
+    if (sid === searchSeq) { showStatus(esc(t("notFound")) + esc(e.message), true); $("go").disabled = false; }
+    return;
+  }
+  if (sid !== searchSeq) return;
+  showStatus("");
+  state = {id: sid, src, radius, results: {}, surveys: {}, sdss: null, pendingPlots: []};
+  renderSource(src);
+  buildTable();
+  renderTotal();
+  $("results").classList.remove("hidden");
+  showMap(src);
+  runSurveys(sid);
+  runSdss(sid);
+  await pool(MISSIONS.map((m) => m.key), 6, (k) => runMission(k, sid));
+  if (sid === searchSeq) $("go").disabled = false;
+}
+
+async function loadMissions() {
+  const start = Date.now();
+  let shown = false;
+  for (;;) {
+    try { return await getJSON(API + "missions"); }
+    catch (e) {
+      if (Date.now() - start > 150000) throw e;
+      if (!shown) { showStatus(`<span class="spin"></span> ${esc(t("waking"))}`); shown = true; }
+      await new Promise((r) => setTimeout(r, 4000));
+    }
+  }
+}
+
+(async function boot() {
+  lang = pickLang();
+  applyStatic();
+  initMapControls();
+  $("examples").innerHTML = EXAMPLES.map((e) => `<span class="chip" role="button" tabindex="0">${esc(e)}</span>`).join("");
+  $("examples").addEventListener("click", (ev) => {
+    if (!ev.target.classList.contains("chip")) return;
+    $("q").value = ev.target.textContent; search($("q").value);
+  });
+  $("form").addEventListener("submit", (ev) => { ev.preventDefault(); search($("q").value); });
+  $("hideZero").addEventListener("change", () => state && applyHideZero());
+  $("csv").addEventListener("click", downloadCsv);
+  document.querySelectorAll(".lang button").forEach((b) => b.addEventListener("click", () => setLang(b.dataset.lang)));
+  const p = new URLSearchParams(location.search);
+  if (p.get("r")) { document.querySelector("input[value=fixed]").checked = true; $("radius").value = p.get("r"); }
+  if (p.get("q")) $("q").value = p.get("q");
+  try {
+    const m = await loadMissions();
+    MISSIONS = m.missions; SURVEYS = m.surveys;
+    showStatus("");
+  } catch (e) { showStatus(esc(t("noServer")) + esc(e.message), true); return; }
+  if (p.get("q")) search(p.get("q"));
+  else if (window.self === window.top) $("q").focus();
+})();
+</script>
+</body>
+</html>
