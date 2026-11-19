@@ -1,10 +1,10 @@
 # X-ray Archive Finder
 
-Enter a source name (any SIMBAD identifier) or coordinates and see how many observations each X-ray mission has of it in the NASA HEASARC archive, with dates, exposures and observation IDs. It also shows the field in optical, X-ray and radio surveys, ROSAT/eROSITA all-sky survey coverage, and the SDSS spectrum when one exists.
+Enter a source name (any SIMBAD identifier) or coordinates and see how many observations each X-ray mission has of it in the NASA HEASARC archive, with dates, exposures and observation IDs. It also shows synced optical / X-ray / radio image panels, X-ray and radio catalogue fluxes (CSC 2.2, 5XMM-DR15, 2SXPS, eRASS1, 2RXS, NuSTAR, Swift-BAT, INTEGRAL/IBIS, NVSS, SUMSS, WENSS from HEASARC; VLASS, FIRST, RACS, TGSS, LoTSS, GLEAM live from VizieR), ROSAT/eROSITA all-sky survey coverage, and the SDSS spectrum when one exists. A batch mode runs a list of up to 500 names or coordinates from a file and exports a CSV.
 
 Live: https://mustafaturansaglam.com/tools/xray-archive-finder/
 
-HEASARC does not allow browser (CORS) queries, so a nightly GitHub Actions job (`build_index.py`) downloads the HEASARC master tables, splits them into 2°×2° sky cells and publishes them with the static page (`static/index.html`) on GitHub Pages. The page reads only the cells around the requested position; name resolution (SIMBAD) and SDSS spectra are queried live from the browser.
+HEASARC does not allow browser (CORS) queries, so a nightly GitHub Actions job (`build_index.py`) downloads the HEASARC master tables (and, weekly, the source catalogues), splits them into 2°×2° sky cells and publishes them with the static page (`static/index.html`) on GitHub Pages. The page reads only the cells around the requested position; name resolution (SIMBAD) and SDSS spectra are queried live from the browser.
 
 `archive.py` queries HEASARC directly from the command line:
 

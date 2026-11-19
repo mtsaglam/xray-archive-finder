@@ -19,16 +19,37 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - run: pip install -r requirements.txt
-      - name: Download HEASARC tables into sky cells
-        run: python build_index.py _site
-      - run: cp static/index.html _site/index.html
+      # Source catalogues barely change, so they are rebuilt once a week and cached in between.
+      - name: Week number for the catalogue cache
+        id: week
+        run: echo "week=$(date -u +%G-%V)" >> "$GITHUB_OUTPUT"
+      - name: Restore catalogue index
+        id: catcache
+        uses: actions/cache/restore@v4
+        with:
+          path: _cat
+          key: catalogs-v1-${{ hashFiles('build_index.py') }}-${{ steps.week.outputs.week }}
+      - name: Build catalogue index
+        if: steps.catcache.outputs.cache-hit != 'true'
+        run: python build_index.py _cat --catalogs
+      - name: Save catalogue index
+        if: steps.catcache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: _cat
+          key: ${{ steps.catcache.outputs.cache-primary-key }}
+      - name: Download HEASARC observation tables into sky cells
+        run: python build_index.py _site --observations
+      - run: |
+          cp static/index.html _site/index.html
+          cp -r _cat/data/cat _site/data/cat
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site

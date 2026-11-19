@@ -96,6 +96,30 @@ tr.detail th, tr.detail td { padding: 5px 8px; }
 .legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12.5px; margin-top: 8px; color: var(--muted); }
 .note { font-size: 13px; margin: 10px 0 0; }
 footer { margin-top: 28px; color: var(--muted); font-size: 12.5px; }
+.panels { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 860px) { .panels { grid-template-columns: 1fr; } }
+.panel .ph { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 6px; }
+.panel .ph b { font-size: 14px; }
+.panel select { padding: 4px 5px; border-radius: 7px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); max-width: 62%; font-size: 13px; }
+.panel .view { width: 100%; aspect-ratio: 1 / 1; border-radius: 10px; overflow: hidden; border: 1px solid var(--line); background: #000; }
+.panel .pnote { font-size: 12px; color: var(--muted); margin-top: 5px; min-height: 1.4em; }
+table.cat td { white-space: normal; vertical-align: top; }
+table.cat td.flux { white-space: nowrap; font-weight: 600; }
+table.cat .params { font-size: 12.5px; color: var(--muted); }
+table.cat tr.nomatch td { color: var(--zero); }
+.subhead { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 16px 0 6px; }
+.subhead:first-of-type { margin-top: 0; }
+.batch textarea { width: 100%; min-height: 110px; padding: 10px; border-radius: 9px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.batch .row { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; margin-top: 10px; }
+.batch ul { margin: 6px 0 0; padding-left: 20px; color: var(--muted); font-size: 13.5px; }
+.batch code { background: var(--soft); padding: 1px 5px; border-radius: 5px; font-size: 12.5px; }
+.progress { height: 6px; background: var(--soft); border-radius: 99px; overflow: hidden; flex: 1 1 200px; }
+.progress > div { height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+table.btab { font-size: 13px; }
+table.btab th, table.btab td { padding: 5px 7px; }
+table.btab tr.ok { cursor: pointer; }
+table.btab tr.ok:hover td { background: var(--soft); }
+table.btab td.z { color: var(--zero); }
 .hidden { display: none !important; }
 </style>
 </head>
@@ -118,9 +142,35 @@ footer { margin-top: 28px; color: var(--muted); font-size: 12.5px; }
       <label><input type="radio" name="rmode" value="auto" checked> <span data-i18n="radiusAuto"></span></label>
       <label><input type="radio" name="rmode" value="fixed"> <span data-i18n="radiusFixed"></span>
         <input type="number" id="radius" value="5" min="0.1" max="300" step="0.5"> <span data-i18n="arcmin"></span></label>
+      <button type="button" id="batchToggle" data-i18n="batchToggle"></button>
       <span class="lang" style="margin-left:auto"><button type="button" data-lang="en">EN</button><button type="button" data-lang="tr">TR</button></span>
     </div>
     <div class="chips" id="examples"></div>
+  </section>
+
+  <section id="batch" class="card batch hidden">
+    <h2 data-i18n="batchTitle"></h2>
+    <div class="muted" style="font-size:14px" data-i18n="batchIntro"></div>
+    <ul>
+      <li><span data-i18n="fmtName"></span> <code>Cyg X-1</code> <code>Mrk 421</code> <code>4U 1820-30</code></li>
+      <li><span data-i18n="fmtDeg"></span> <code>299.5903 35.2016</code> <code>299.5903, +35.2016</code></li>
+      <li><span data-i18n="fmtSexa"></span> <code>19 58 21.67 +35 12 05.7</code> <code>19:58:21.67 +35:12:05.7</code> <code>19h58m21.67s +35d12m05.7s</code></li>
+      <li data-i18n="fmtSkip"></li>
+    </ul>
+    <div class="row">
+      <input type="file" id="bfile" accept=".txt,.csv,.tsv,.dat,.list,text/plain,text/csv">
+      <span class="muted" style="font-size:13px" data-i18n="orPaste"></span>
+    </div>
+    <textarea id="btext" spellcheck="false" placeholder="Cyg X-1&#10;Mrk 421&#10;299.5903 35.2016&#10;17:45:40.04 -29:00:28.2"></textarea>
+    <div class="row">
+      <button class="primary" id="bgo" type="button" data-i18n="batchRun"></button>
+      <button id="bstop" type="button" class="hidden" data-i18n="batchStop"></button>
+      <button id="bcsv" type="button" disabled data-i18n="csv"></button>
+      <div class="progress"><div id="bbar"></div></div>
+      <span id="bstatus" class="muted" style="font-size:13px"></span>
+    </div>
+    <div class="tablewrap" style="margin-top:12px"><table class="btab" id="btable"></table></div>
+    <p class="muted note" data-i18n="batchNote"></p>
   </section>
 
   <div id="status" class="card hidden"></div>
@@ -150,6 +200,25 @@ footer { margin-top: 28px; color: var(--muted); font-size: 12.5px; }
     <div class="surveys" id="surveys"></div>
   </section>
 
+  <section id="images" class="card hidden">
+    <h2 data-i18n="imgTitle"></h2>
+    <div class="panels">
+      <div class="panel" data-band="opt"><div class="ph"><b data-i18n="pOpt"></b><select></select></div><div class="view" id="v-opt"></div><div class="pnote"></div></div>
+      <div class="panel" data-band="x"><div class="ph"><b data-i18n="pX"></b><select></select></div><div class="view" id="v-x"></div><div class="pnote"></div></div>
+      <div class="panel" data-band="radio"><div class="ph"><b data-i18n="pRadio"></b><select></select></div><div class="view" id="v-radio"></div><div class="pnote"></div></div>
+    </div>
+    <p class="muted note" data-i18n="imgNote"></p>
+  </section>
+
+  <section id="catalogs" class="card hidden">
+    <h2 data-i18n="catTitle"></h2>
+    <div class="subhead" data-i18n="catX"></div>
+    <div class="tablewrap"><table class="cat" id="catx"></table></div>
+    <div class="subhead" data-i18n="catRadio"></div>
+    <div class="tablewrap"><table class="cat" id="catr"></table></div>
+    <p class="muted note" data-i18n="catNote"></p>
+  </section>
+
   <div class="two hidden" id="extras">
     <section class="card">
       <h2 data-i18n="fieldTitle"></h2>
@@ -175,7 +244,7 @@ footer { margin-top: 28px; color: var(--muted); font-size: 12.5px; }
 <script>
 "use strict";
 const DATA = window.XRAY_DATA_BASE || "data/";
-const SIMBAD_MIRRORS = ["https://simbad.cfa.harvard.edu/simbad", "https://simbad.cds.unistra.fr/simbad"];
+const SIMBAD_MIRRORS = ["https://simbad.cds.unistra.fr/simbad", "https://simbad.cfa.harvard.edu/simbad", "https://simbad.idia.ac.za/simbad"];
 const SESAME = "https://cds.unistra.fr/cgi-bin/nph-sesame/-oxp/SNV?";
 const SDSS_BASE = "https://skyserver.sdss.org/dr17";
 const MAX_RADIUS = 300;
@@ -204,7 +273,26 @@ const I18N = {
     firstN: (n, t) => `Showing the first ${n} of ${t} observations; download the CSV for all of them.`,
     covered: "✔ Covered", notCovered: "✘ Not covered", fields: "field",
     outside_dr1: "eRASS1 DR1 only covers the half of the sky with Galactic longitude 180° < l < 360° (German consortium).",
-    fieldTitle: "Field image", base: "Image", overlay: "Overlay", opacity: "Opacity", points: "Pointings", none: "— none —",
+    fieldTitle: "Layered map and observation pointings", base: "Image", overlay: "Overlay", opacity: "Opacity", points: "Pointings", none: "— none —",
+    imgTitle: "Images", pOpt: "Optical", pX: "X-ray", pRadio: "Radio",
+    imgNote: "The three panels move and zoom together; drag or scroll in any of them. The X-ray panel picks Chandra or XMM-Newton when this source has observations with them, otherwise the eROSITA or ROSAT survey; the radio panel picks the best survey covering this declination. Change any panel from its menu.",
+    pickedBecause: {chandra: "Chandra observations exist for this source", xmm: "XMM-Newton observations exist for this source", erosita: "eROSITA all-sky survey (DR1)", rass: "ROSAT all-sky survey", radio: "covers this declination", fallback: "no better image reachable right now"},
+    noXrayObs: "No Chandra or XMM-Newton observation of this source; showing an all-sky survey.",
+    catTitle: "Catalogue fluxes", catX: "X-ray source catalogues", catRadio: "Radio source catalogues",
+    cCat: "Catalogue", cBand: "Band", cFlux: "Flux", cSep: "Sep. (″)", cName: "Name", cParams: "Other parameters", cPosErr: "pos. err",
+    noMatch: (r) => `no source within ${r}″`, outside: "outside survey coverage", more: (n) => `+${n} more within the radius`,
+    liveQuery: "VizieR (live)", catLoading: "querying…",
+    catNote: "Nearest catalogue source within the listed match radius; check the separation against the positional error before trusting a match. X-ray fluxes are in erg/s/cm² (INTEGRAL in mCrab), radio fluxes in mJy. CSC errors are 68% limits and BAT errors 90% limits; the rest are 1σ. NVSS, SUMSS, WENSS and all X-ray catalogues come from HEASARC; FIRST, VLASS, RACS, TGSS, LoTSS and GLEAM are queried live from VizieR.",
+    batchToggle: "Batch search (file)", batchTitle: "Batch search",
+    batchIntro: "Upload a text or CSV file, or paste a list, with one source per line (up to 500). Each line can be:",
+    fmtName: "a source name (any SIMBAD identifier):", fmtDeg: "decimal RA Dec in degrees (J2000):", fmtSexa: "sexagesimal RA Dec (J2000):",
+    fmtSkip: "Empty lines and lines starting with # are skipped; a single header line such as “name” or “source” is ignored. Only the first column of a multi-column CSV is used.",
+    orPaste: "…or paste the list below:", batchRun: "Run batch search", batchStop: "Stop",
+    batchNote: "Counts use the radius option above. X-ray flux is the first match among CSC, 5XMM, 2SXPS, eRASS1, 2RXS, NuSTAR and BAT; radio is NVSS, SUMSS or WENSS (the live VizieR catalogues are only in the single-source view). Click a row to open that source above. The CSV has every mission and catalogue.",
+    bParsing: "Reading the list…", bResolving: (a, b) => `Resolving names ${a}/${b}…`, bSearching: (a, b) => `Searching ${a}/${b}…`,
+    bDone: (n, ok) => `Done: ${ok} of ${n} sources resolved.`, bStopped: "Stopped.", bEmpty: "The list is empty.",
+    bTooMany: (n) => `Only the first 500 of ${n} lines are used.`, bCols: {input: "Input", name: "Resolved", total: "Total obs.", xflux: "X-ray flux", rflux: "Radio (mJy)"},
+    bNotFound: "not found",
     groups: {opt: "Optical", x: "X-ray", radio: "Radio"}, color: "color",
     mapNote: "Markers show observation pointing centres (toggle layers from the menu at the top left of the map). Aladin Lite / HiPS.",
     aladinFail: "Aladin Lite could not be loaded",
@@ -237,7 +325,26 @@ const I18N = {
     firstN: (n, t) => `İlk ${n} gözlem gösteriliyor (toplam ${t}); tamamı için CSV indirin.`,
     covered: "✔ Kapsıyor", notCovered: "✘ Kapsamıyor", fields: "alan",
     outside_dr1: "eRASS1 DR1 yalnızca Galaktik boylamı 180° < l < 360° olan yarıküreyi (Alman konsorsiyumu) içerir.",
-    fieldTitle: "Alan görüntüsü", base: "Görüntü", overlay: "Üst katman", opacity: "Opaklık", points: "Gözlem noktaları", none: "— yok —",
+    fieldTitle: "Katmanlı harita ve gözlem noktaları", base: "Görüntü", overlay: "Üst katman", opacity: "Opaklık", points: "Gözlem noktaları", none: "— yok —",
+    imgTitle: "Görüntüler", pOpt: "Optik", pX: "X-ray", pRadio: "Radyo",
+    imgNote: "Üç panel birlikte kayar ve yakınlaşır; herhangi birinde sürükleyin veya kaydırın. X-ray paneli, kaynağın Chandra veya XMM-Newton gözlemi varsa onu, yoksa eROSITA veya ROSAT taramasını seçer; radyo paneli bu deklinasyonu kapsayan en iyi taramayı seçer. Her paneli kendi menüsünden değiştirebilirsiniz.",
+    pickedBecause: {chandra: "bu kaynağın Chandra gözlemi var", xmm: "bu kaynağın XMM-Newton gözlemi var", erosita: "eROSITA tüm gökyüzü taraması (DR1)", rass: "ROSAT tüm gökyüzü taraması", radio: "bu deklinasyonu kapsıyor", fallback: "şu an daha iyi bir görüntüye erişilemiyor"},
+    noXrayObs: "Bu kaynağın Chandra veya XMM-Newton gözlemi yok; tüm gökyüzü taraması gösteriliyor.",
+    catTitle: "Katalog akıları", catX: "X-ray kaynak katalogları", catRadio: "Radyo kaynak katalogları",
+    cCat: "Katalog", cBand: "Bant", cFlux: "Akı", cSep: "Uzaklık (″)", cName: "Ad", cParams: "Diğer parametreler", cPosErr: "konum hatası",
+    noMatch: (r) => `${r}″ içinde kaynak yok`, outside: "taramanın kapsamı dışında", more: (n) => `yarıçap içinde ${n} kaynak daha`,
+    liveQuery: "VizieR (canlı)", catLoading: "sorgulanıyor…",
+    catNote: "Listelenen eşleşme yarıçapı içindeki en yakın katalog kaynağı gösterilir; eşleşmeye güvenmeden önce uzaklığı konum hatasıyla karşılaştırın. X-ray akıları erg/s/cm² (INTEGRAL mCrab), radyo akıları mJy birimindedir. CSC hataları %68, BAT hataları %90 sınırlarıdır; diğerleri 1σ. NVSS, SUMSS, WENSS ve tüm X-ray katalogları HEASARC'tan; FIRST, VLASS, RACS, TGSS, LoTSS ve GLEAM VizieR'den canlı sorgulanır.",
+    batchToggle: "Toplu tarama (dosya)", batchTitle: "Toplu tarama",
+    batchIntro: "Her satırda bir kaynak olan bir metin veya CSV dosyası yükleyin ya da listeyi yapıştırın (en fazla 500). Her satır şunlardan biri olabilir:",
+    fmtName: "kaynak adı (SIMBAD'daki herhangi bir ad):", fmtDeg: "derece cinsinden ondalık RA Dec (J2000):", fmtSexa: "sekizlik (sexagesimal) RA Dec (J2000):",
+    fmtSkip: "Boş satırlar ve # ile başlayan satırlar atlanır; “name” veya “source” gibi tek bir başlık satırı yok sayılır. Çok kolonlu CSV'de yalnızca ilk kolon kullanılır.",
+    orPaste: "…veya listeyi aşağıya yapıştırın:", batchRun: "Toplu taramayı başlat", batchStop: "Durdur",
+    batchNote: "Sayımlar yukarıdaki yarıçap seçeneğini kullanır. X-ray akısı CSC, 5XMM, 2SXPS, eRASS1, 2RXS, NuSTAR ve BAT sırasıyla ilk eşleşmedir; radyo NVSS, SUMSS veya WENSS'tir (canlı VizieR katalogları yalnızca tek kaynak görünümünde). Bir satıra tıklayınca o kaynak yukarıda açılır. CSV dosyası tüm uyduları ve katalogları içerir.",
+    bParsing: "Liste okunuyor…", bResolving: (a, b) => `İsimler çözümleniyor ${a}/${b}…`, bSearching: (a, b) => `Taranıyor ${a}/${b}…`,
+    bDone: (n, ok) => `Bitti: ${n} kaynağın ${ok} tanesi çözümlendi.`, bStopped: "Durduruldu.", bEmpty: "Liste boş.",
+    bTooMany: (n) => `${n} satırın yalnızca ilk 500'ü kullanılıyor.`, bCols: {input: "Girdi", name: "Çözümlenen", total: "Toplam gözlem", xflux: "X-ray akısı", rflux: "Radyo (mJy)"},
+    bNotFound: "bulunamadı",
     groups: {opt: "Optik", x: "X-ray", radio: "Radyo"}, color: "renkli",
     mapNote: "Noktalar gözlemlerin yönelim merkezleridir (katmanlar haritanın sol üstündeki menüden açılıp kapatılabilir). Aladin Lite / HiPS.",
     aladinFail: "Aladin Lite yüklenemedi",
@@ -261,12 +368,28 @@ const HIPS = [
   ["ESDC/P/XMM/EPIC-RGB", "XMM-Newton EPIC RGB", "x", ["https://esdchips.esac.esa.int/XMM-Newton/EPIC-RGB"]],
   ["cxc.harvard.edu/P/cda/hips/allsky/rgb", "Chandra RGB", "x", ["https://cdaftp.cfa.harvard.edu/cxc-hips"]],
   ["erosita/dr1/rate/rgb", "eROSITA DR1 RGB", "x", ["https://erosita.mpe.mpg.de/erodat/static/hips/eRASS1_RGB_Rate_c010"]],
-  ["ov-gso/P/RASS", "ROSAT All-Sky Survey", "x", []],
-  ["CDS/P/NVSS", "NVSS 1.4 GHz", "radio", ["https://hips.china-vo.org/m/CDS_P_NVSS"]],
+  ["ov-gso/P/RASS", "ROSAT All-Sky Survey", "x", ["https://cade.irap.omp.eu/documents/Ancillary/4Aladin/RASS"]],
   ["NRAO/P/VLASS-Quicklook-MedianStack", "VLASS 3 GHz", "radio", ["https://vlass-dl.nrao.edu/vlass/HiPS/MedianStack/Quicklook"]],
+  ["CDS/P/NVSS", "NVSS 1.4 GHz", "radio", ["https://hips.china-vo.org/m/CDS_P_NVSS", "https://casda.csiro.au/hips/NVSS", "https://skies.esac.esa.int/NVSS"]],
   ["CSIRO/P/RACS/mid/I", "RACS-mid 1.37 GHz", "radio", ["https://casda.csiro.au/hips/RACS/mid/I"]],
-  ["CDS/P/SUMSS", "SUMSS 843 MHz", "radio", []],
+  ["CSIRO/P/RACS/low/I", "RACS-low 888 MHz", "radio", ["https://casda.csiro.au/hips/RACS/low/I"]],
+  ["CDS/P/SUMSS", "SUMSS 843 MHz", "radio", ["https://casda.csiro.au/hips/SUMSS", "https://cade.irap.omp.eu/documents/Ancillary/4Aladin/SUMSS"]],
 ];
+// Radio survey footprints (declination limits) used to pick the radio panel and flag "outside coverage".
+const DEC_COVER = {"NRAO/P/VLASS-Quicklook-MedianStack": [-40, 90], "CDS/P/NVSS": [-40, 90], "CSIRO/P/RACS/mid/I": [-90, 49],
+  "CSIRO/P/RACS/low/I": [-90, 30], "CDS/P/SUMSS": [-90, -30]};
+
+// Radio catalogues queried live from VizieR (not in HEASARC). match = radius in arcsec; scale converts to mJy.
+const VIZIER_MIRRORS = ["https://vizier.cfa.harvard.edu", "https://vizier.idia.ac.za", "https://vizier.cds.unistra.fr"];
+const RADIO_LIVE = [
+  {key: "vlass", label: "VLASS Ep.1 (CIRADA)", band: "3 GHz", src: "J/ApJS/255/30/comp", match: 5, name: "CompName", flux: "Ftot", err: "e_Ftot", dec: [-40, 90]},
+  {key: "first", label: "FIRST", band: "1.4 GHz", src: "VIII/92/first14", match: 5, name: "FIRST", flux: "Fint", err: "Rms", dec: [-11, 58]},
+  {key: "racs", label: "RACS-low DR1", band: "888 MHz", src: "J/other/PASA/38.58/gausscut", match: 15, name: "ID", flux: "Ftot", err: "e_Ftot", dec: [-90, 30]},
+  {key: "tgss", label: "TGSS ADR1", band: "150 MHz", src: "J/A+A/598/A78/table3", match: 15, name: "TGSSADR", flux: "Stotal", err: "e_Stotal", dec: [-53, 90]},
+  {key: "lotss", label: "LoTSS-DR2", band: "144 MHz", src: "J/A+A/659/A1/catalog", match: 6, name: "Source", flux: "SpeakTot", err: "e_SpeakTot", dec: [0, 90]},
+  {key: "gleam", label: "GLEAM", band: "200 MHz", src: "VIII/100/gleamegc", match: 60, name: "GLEAM", flux: "Fintwide", err: "e_Fintwide", dec: [-90, 30], scale: 1000},
+];
+const CAT_DEC_COVER = {nvss: [-40, 90], sumss: [-90, -30], wenss: [28, 90]};
 const HIPS_BY_ID = Object.fromEntries(HIPS.map((h) => [h[0], h]));
 const hipsCache = {};
 
@@ -304,6 +427,8 @@ function setLang(l) {
   lang = l;
   try { localStorage.setItem("xray-finder-lang", l); } catch (e) { /* no storage */ }
   applyStatic();
+  renderBatch();
+  if (MANIFEST) $("updated").textContent = t("updated")(MANIFEST.updated);
   if (!state) return;
   renderSource(state.src);
   MISSIONS.forEach((m) => {
@@ -316,6 +441,7 @@ function setLang(l) {
   renderTotal();
   renderSurveys();
   renderSdss();
+  renderCatalogs();
 }
 
 if (window.self !== window.top) {
@@ -410,30 +536,51 @@ function parseCoords(text) {
 // ---------------------------------------------------------------- name resolution (SIMBAD, Sesame fallback)
 const SIMBAD_FMT = 'format object "%MAIN_ID|%COO(d;A D)|%OTYPE(V)|%IDLIST[%*;]"';
 
-async function simbadScript(body) {
+// All mirrors are asked at once and the first valid answer wins, so one mirror being down costs nothing.
+async function simbadScript(body, timeout) {
   const script = "output console=off script=off\n" + SIMBAD_FMT + "\n" + body;
-  for (const base of SIMBAD_MIRRORS) {
-    try {
-      const r = await fetchTimeout(base + "/sim-script?script=" + encodeURIComponent(script), 25000);
-      if (!r.ok) continue;
-      const txt = await r.text();
-      if (/<html/i.test(txt.slice(0, 500))) continue;
-      return {base, txt};
-    } catch (e) { /* next mirror */ }
-  }
-  return null;
+  const ask = async (base) => {
+    const r = await fetchTimeout(base + "/sim-script", timeout || 25000, {method: "POST", body: new URLSearchParams({script})});
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const txt = await r.text();
+    if (/<html/i.test(txt.slice(0, 500))) throw new Error("not SIMBAD");
+    return {base, txt};
+  };
+  try { return await Promise.any(SIMBAD_MIRRORS.map(ask)); } catch (e) { return null; }
+}
+
+function parseSimbadLine(line) {
+  const p = line.split("|");
+  if (p.length < 4) return null;
+  const c = p[1].trim().split(/\s+/);
+  if (c.length !== 2 || isNaN(+c[0]) || isNaN(+c[1]) || c[0] === "") return null;
+  return {main_id: p[0].trim().replace(/\s+/g, " "), ra: +c[0], dec: +c[1], otype: p[2].trim(),
+    aliases: p[3].split(";").map((a) => a.trim().replace(/\s+/g, " ")).filter(Boolean)};
+}
+
+function dataLines(txt) {
+  let inError = false;
+  return txt.split("\n").filter((line) => {
+    if (line.startsWith("::error")) { inError = true; return false; }
+    if (line.startsWith("::data")) { inError = false; return false; }
+    return !inError && line.includes("|");
+  });
 }
 
 function parseSimbad(txt) {
   if (txt.includes("::error::")) return [];
-  return txt.split("\n").map((line) => {
-    const p = line.split("|");
-    if (p.length < 4) return null;
-    const c = p[1].trim().split(/\s+/);
-    if (c.length !== 2 || isNaN(+c[0]) || isNaN(+c[1])) return null;
-    return {main_id: p[0].trim().replace(/\s+/g, " "), ra: +c[0], dec: +c[1], otype: p[2].trim(),
-      aliases: p[3].split(";").map((a) => a.trim().replace(/\s+/g, " ")).filter(Boolean)};
-  }).filter(Boolean);
+  return dataLines(txt).map(parseSimbadLine).filter(Boolean);
+}
+
+// Results of a multi-line "query id" script: failed queries are listed by script line number
+// (line 1 = output, line 2 = format, so query k is on line k + 3); the rest come back in order.
+function parseSimbadBatch(txt, n) {
+  const failed = new Set([...txt.matchAll(/^\[(\d+)\]/gm)].map((m) => +m[1] - 3));
+  const data = dataLines(txt);
+  const out = [];
+  let k = 0;
+  for (let i = 0; i < n; i++) out.push(failed.has(i) ? null : parseSimbadLine(data[k++] || ""));
+  return out;
 }
 
 async function sesame(name) {
@@ -500,8 +647,74 @@ function loadCell(key, idx) {
     const p = getJSON(url);
     p.catch(() => cellCache.delete(url));
     cellCache.set(url, p);
+    if (cellCache.size > 3000) cellCache.delete(cellCache.keys().next().value);
   }
   return cellCache.get(url);
+}
+
+// ---------------------------------------------------------------- source catalogues (static cells + live VizieR)
+let CATMAN = null;
+
+async function loadCatManifest() {
+  try {
+    CATMAN = await getJSON(DATA + "cat/manifest.json");
+    CATMAN.catalogs.forEach((c) => { c.cellSet = new Set(c.cells); });
+  } catch (e) { CATMAN = {catalogs: []}; }
+}
+
+function inDec(range, dec) { return !range || (dec >= range[0] && dec <= range[1]); }
+
+function catCoverage(c, ra, dec) {
+  if (c.key === "erass1") { const l = toGalactic(ra, dec)[0]; return l > 179.9442 && l < 359.9442; }
+  return inDec(CAT_DEC_COVER[c.key], dec);
+}
+
+async function queryCatalog(c, ra, dec) {
+  const r = c.match / 3600;
+  const idxs = cellsForCircle(ra, dec, r).filter((i) => c.cellSet.has(i));
+  const cells = await Promise.all(idxs.map((i) => loadCell("cat/" + c.key, i)));
+  const hits = [];
+  for (const rows of cells) for (const row of rows) {
+    const sep = sepDeg(ra, dec, row[0], row[1]) * 3600;
+    if (sep <= c.match) hits.push({sep, ra: row[0], dec: row[1], name: row[2], poserr: row[3], flux: row[4],
+      eneg: row[5], epos: row[6], params: row.slice(7)});
+  }
+  hits.sort((a, b) => a.sep - b.sep);
+  return {cat: c, hits, covered: catCoverage(c, ra, dec)};
+}
+
+function parseVizierTsv(txt) {
+  const lines = txt.split("\n").filter((l) => l && !l.startsWith("#"));
+  if (lines.length < 3) return [];
+  const head = lines[0].split("\t").map((h) => h.trim());
+  return lines.slice(3).map((l) => {
+    const v = l.split("\t");
+    return Object.fromEntries(head.map((h, i) => [h, (v[i] || "").trim()]));
+  });
+}
+
+async function queryVizier(c, ra, dec) {
+  const covered = inDec(c.dec, dec);
+  if (!covered) return {cat: c, hits: [], covered};
+  const qs = new URLSearchParams({"-source": c.src, "-c": `${ra.toFixed(6)} ${dec >= 0 ? "+" : ""}${dec.toFixed(6)}`,
+    "-c.rs": String(c.match), "-out": `${c.name},${c.flux},${c.err}`, "-out.add": "_r,_RAJ,_DEJ", "-sort": "_r", "-out.max": "20"});
+  const ask = async (base) => {
+    const r = await fetchTimeout(`${base}/viz-bin/asu-tsv?${qs}`, 30000);
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const txt = await r.text();
+    if (!txt.includes("#")) throw new Error("not VizieR");
+    return parseVizierTsv(txt);
+  };
+  const rows = await Promise.any(VIZIER_MIRRORS.map(ask)).catch(() => { throw new Error("VizieR unreachable"); });
+  const scale = c.scale || 1, seen = new Set(), hits = [];
+  for (const r of rows) {
+    if (seen.has(r[c.name])) continue;
+    seen.add(r[c.name]);
+    const f = parseFloat(r[c.flux]), e = parseFloat(r[c.err]);
+    hits.push({sep: parseFloat(r._r), ra: parseFloat(r._RAJ2000), dec: parseFloat(r._DEJ2000), name: r[c.name],
+      flux: isNaN(f) ? null : f * scale, eneg: isNaN(e) ? null : e * scale, epos: isNaN(e) ? null : e * scale, params: []});
+  }
+  return {cat: c, hits, covered};
 }
 
 async function queryMission(m, ra, dec, radiusArcmin) {
@@ -714,6 +927,7 @@ async function runMission(key, sid) {
   renderRow(key);
   renderTotal();
   if (!res.error) plotPointings(key, res);
+  if (panels && !state.xrayPicked && state.results.chandra && state.results.xmm) { state.xrayPicked = true; pickXrayPanel(sid); }
 }
 
 // ---------------------------------------------------------------- surveys / sdss
@@ -778,6 +992,7 @@ function buildMapSelects() {
     sel.innerHTML = html(withNone);
     if (v) sel.value = v;
   }
+  buildPanelSelects();
 }
 
 function initMapControls() {
@@ -880,6 +1095,171 @@ function plotPointings(key, res) {
   $("legend").insertAdjacentHTML("beforeend", `<span><span class="dot" style="background:${color}"></span>${esc(res.label)}</span>`);
 }
 
+// ---------------------------------------------------------------- optical / X-ray / radio panels
+const BANDS = ["opt", "x", "radio"];
+let panels = null;
+const panelNotes = {};
+
+function buildPanelSelects() {
+  for (const band of BANDS) {
+    const sel = document.querySelector(`.panel[data-band=${band}] select`), v = sel.value;
+    sel.innerHTML = HIPS.filter((h) => h[2] === band).map((h) => `<option value="${h[0]}">${esc(hipsLabel(h[0]))}</option>`).join("");
+    if (v) sel.value = v;
+  }
+  renderPanelNotes();
+}
+
+function renderPanelNotes() {
+  for (const band of BANDS) {
+    const n = panelNotes[band];
+    document.querySelector(`.panel[data-band=${band}] .pnote`).textContent = n ? (t("pickedBecause")[n] || "") : "";
+  }
+}
+
+async function reachable(id) { return HIPS_BY_ID[id][3].length > 0 && (await hipsSource(id)) !== id; }
+
+async function pickFirst(cands) {
+  for (const [id, why] of cands) if (await reachable(id)) return [id, why];
+  return cands.length ? [cands[0][0], "fallback"] : null;
+}
+
+async function setPanel(band, id, why) {
+  if (!panels) return;
+  const src = await hipsSource(id);
+  panels[band].setBaseImageLayer(A.imageHiPS(src, {name: hipsLabel(id)}));
+  document.querySelector(`.panel[data-band=${band}] select`).value = id;
+  panelNotes[band] = why || null;
+  renderPanelNotes();
+}
+
+function radioCandidates(dec) {
+  return HIPS.filter((h) => h[2] === "radio" && inDec(DEC_COVER[h[0]], dec)).map((h) => [h[0], "radio"]);
+}
+
+async function pickXrayPanel(sid) {
+  const res = state.results;
+  const cands = [];
+  if (res.chandra && res.chandra.n_done > 0) cands.push(["cxc.harvard.edu/P/cda/hips/allsky/rgb", "chandra"]);
+  if (res.xmm && res.xmm.n_done > 0) cands.push(["ESDC/P/XMM/EPIC-RGB", "xmm"]);
+  const l = state.src.l;
+  if (l > 179.9442 && l < 359.9442) cands.push(["erosita/dr1/rate/rgb", "erosita"]);
+  cands.push(["ov-gso/P/RASS", "rass"]);
+  const pick = await pickFirst(cands);
+  if (sid === searchSeq && pick) setPanel("x", pick[0], pick[1]);
+}
+
+async function showPanels(src, sid) {
+  $("images").classList.remove("hidden");
+  try { await waitAladin(); } catch (e) { $("v-opt").innerHTML = `<p style="color:#fff;padding:12px">${esc(e.message)}</p>`; return; }
+  if (sid !== searchSeq) return;
+  const fov = 0.25;
+  if (!panels) {
+    const start = await hipsSource("CDS/P/DSS2/color");
+    if (panels) return;
+    const made = {};
+    for (const band of BANDS) {
+      made[band] = A.aladin("#v-" + band, {survey: start, fov, target: `${src.ra} ${src.dec}`,
+        showReticle: true, showLayersControl: false, showCooGridControl: false, showSimbadPointerControl: false,
+        showProjectionControl: false, showFrame: false, showCooLocation: false, showFullscreenControl: true,
+        showZoomControl: true, showSettingsControl: false, showShareControl: false, hipsList: []});
+    }
+    panels = made;
+    for (const band of BANDS) {
+      const me = panels[band];
+      const others = () => BANDS.filter((b) => b !== band).map((b) => panels[b]);
+      me.on("positionChanged", (p) => others().forEach((o) => {
+        const [ra, dec] = o.getRaDec();
+        if (Math.abs(ra - p.ra) > 1e-7 || Math.abs(dec - p.dec) > 1e-7) o.gotoRaDec(p.ra, p.dec);
+      }));
+      me.on("zoomChanged", (f) => others().forEach((o) => { if (Math.abs(o.getFov()[0] - f) > 1e-6) o.setFoV(f); }));
+      document.querySelector(`.panel[data-band=${band}] select`).addEventListener("change", (ev) => setPanel(band, ev.target.value, null));
+    }
+  } else {
+    for (const band of BANDS) { panels[band].removeLayers(); panels[band].gotoRaDec(src.ra, src.dec); panels[band].setFoV(fov); }
+  }
+  for (const band of BANDS) {
+    const g = A.graphicOverlay({color: "#ffffff", lineWidth: 1.5});
+    panels[band].addOverlay(g);
+    g.add(A.circle(src.ra, src.dec, 8 / 3600));
+  }
+  setPanel("opt", "CDS/P/DSS2/color", null);
+  const radio = await pickFirst(radioCandidates(src.dec));
+  if (radio && sid === searchSeq) setPanel("radio", radio[0], radio[1]);
+  if (state.results.chandra && state.results.xmm && !state.xrayPicked) { state.xrayPicked = true; pickXrayPanel(sid); }
+}
+
+// ---------------------------------------------------------------- catalogue table
+const SUP = {"-": "⁻", "0": "⁰", "1": "¹", "2": "²", "3": "³", "4": "⁴", "5": "⁵", "6": "⁶", "7": "⁷", "8": "⁸", "9": "⁹"};
+const RADIO_ORDER = ["vlass", "nvss", "first", "racs", "sumss", "wenss", "gleam", "tgss", "lotss"];
+
+function fmtFlux(v, eneg, epos, unit) {
+  if (v == null) return "—";
+  const sci = /erg/.test(unit || "") && v !== 0;
+  const ex = sci ? Math.floor(Math.log10(Math.abs(v))) : 0;
+  const s = (x) => (x == null ? null : x / 10 ** ex);
+  const m = s(v), en = s(eneg), ep = s(epos);
+  let txt = Number(m.toPrecision(3)).toString();
+  if (en != null && ep != null && en > 0 && ep > 0) {
+    const big = Math.max(en, ep);
+    if (big / Math.abs(m) < 0.001) {
+      txt += " ± <0.1%";
+    } else {
+      // two significant digits in the error, value rounded to the same decimal place
+      const d = Math.min(4, Math.max(0, 1 - Math.floor(Math.log10(Math.min(en, ep)))));
+      txt = Math.abs(en - ep) <= 0.1 * big ? `${m.toFixed(d)} ± ${((en + ep) / 2).toFixed(d)}`
+        : `${m.toFixed(d)} +${ep.toFixed(d)}/−${en.toFixed(d)}`;
+    }
+  }
+  if (sci) txt = `${/ /.test(txt) ? `(${txt})` : txt} × 10${String(ex).split("").map((c) => SUP[c]).join("")}`;
+  return txt;
+}
+
+function fmtParam(v) {
+  if (v == null || v === "") return null;
+  if (typeof v === "number") return Number(v.toPrecision(3)).toString();
+  return String(v);
+}
+
+function catRow(c, res, live) {
+  const head = `<td><b>${esc(c.label)}</b>${live ? `<div class="params">${t("liveQuery")}</div>` : ""}</td><td>${esc(c.band)}</td>`;
+  if (!res) return `<tr>${head}<td colspan="4" class="muted"><span class="spin"></span> ${t("catLoading")}</td></tr>`;
+  if (res.error) return `<tr class="nomatch">${head}<td colspan="4">${esc(res.error)}</td></tr>`;
+  if (!res.hits.length) return `<tr class="nomatch">${head}<td colspan="4">${res.covered ? t("noMatch")(c.match) : t("outside")}</td></tr>`;
+  const h = res.hits[0];
+  const unit = c.unit || "mJy";
+  const params = [];
+  if (h.poserr != null) params.push(`${t("cPosErr")} ${fmtParam(h.poserr)}″${c.poserr_note ? " (" + c.poserr_note + ")" : ""}`);
+  (c.params || []).forEach((label, i) => { const v = fmtParam(h.params[i]); if (v != null) params.push(`${label}: ${v}`); });
+  if (res.hits.length > 1) params.push(t("more")(res.hits.length - 1));
+  return `<tr>${head}<td class="flux">${fmtFlux(h.flux, h.eneg, h.epos, unit)} <span class="muted" style="font-weight:400;font-size:12px">${esc(unit)}</span></td>
+    <td class="num">${fmt(h.sep, 1)}</td><td>${esc(h.name || "")}</td><td class="params">${params.map(esc).join(" · ")}</td></tr>`;
+}
+
+function renderCatalogs() {
+  if (!state || !CATMAN) return;
+  const head = `<thead><tr><th>${t("cCat")}</th><th>${t("cBand")}</th><th>${t("cFlux")}</th><th class="num">${t("cSep")}</th><th>${t("cName")}</th><th>${t("cParams")}</th></tr></thead>`;
+  const xs = CATMAN.catalogs.filter((c) => c.kind === "x");
+  $("catx").innerHTML = head + "<tbody>" + xs.map((c) => catRow(c, state.cats[c.key], false)).join("") + "</tbody>";
+  const radio = [...CATMAN.catalogs.filter((c) => c.kind === "radio").map((c) => [c, false]), ...RADIO_LIVE.map((c) => [c, true])]
+    .sort((a, b) => RADIO_ORDER.indexOf(a[0].key) - RADIO_ORDER.indexOf(b[0].key));
+  $("catr").innerHTML = head + "<tbody>" + radio.map(([c, live]) => catRow(c, state.cats[c.key], live)).join("") + "</tbody>";
+}
+
+async function runCatalogs(sid) {
+  $("catalogs").classList.remove("hidden");
+  state.cats = {};
+  renderCatalogs();
+  const {ra, dec} = state.src;
+  const jobs = [...CATMAN.catalogs.map((c) => [c, queryCatalog(c, ra, dec)]), ...RADIO_LIVE.map((c) => [c, queryVizier(c, ra, dec)])];
+  await Promise.all(jobs.map(async ([c, p]) => {
+    let r;
+    try { r = await p; } catch (e) { r = {error: e.message}; }
+    if (sid !== searchSeq) return;
+    state.cats[c.key] = r;
+    renderCatalogs();
+  }));
+}
+
 // ---------------------------------------------------------------- CSV
 function downloadCsv() {
   const head = ["mission","obsid","target","date","mjd","exposure_ks","offset_arcmin","status","observed","proprietary","public_date","ra","dec"];
@@ -891,14 +1271,193 @@ function downloadCsv() {
     r.observations.forEach((o) => lines.push([r.label, o.id, o.name, o.date, o.mjd, o.exposure_ks, o.offset_arcmin, o.status, o.done, o.proprietary, o.public_date, o.ra, o.dec].map(q).join(",")));
   });
   const name = (state.src.main_id || state.src.query).replace(/[^\w.+-]+/g, "_");
-  const blob = new Blob([lines.join("\n")], {type: "text/csv"});
+  saveText(`xray_obs_${name}.csv`, lines.join("\n"));
+}
+
+function saveText(filename, text) {
   const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = `xray_obs_${name}.csv`;
+  a.href = URL.createObjectURL(new Blob([text], {type: "text/csv"}));
+  a.download = filename;
   document.body.append(a);
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+
+// ---------------------------------------------------------------- batch search
+const BATCH_MAX = 500;
+const SHORT = {chandra: "Chandra", xmm: "XMM", swift: "Swift", nustar: "NuSTAR", nicer: "NICER", xrism: "XRISM", ixpe: "IXPE",
+  erosita: "eROSITA", integral: "INTEGRAL", suzaku: "Suzaku", hitomi: "Hitomi", rxte: "RXTE", rosat: "ROSAT", asca: "ASCA",
+  bepposax: "SAX", exosat: "EXOSAT", ginga: "Ginga"};
+const XFLUX_ORDER = ["csc", "xmm", "sxps", "erass1", "rxs2", "nustar", "bat"];
+const CAT_SHORT = {csc: "CSC", xmm: "5XMM", sxps: "2SXPS", erass1: "eRASS1", rxs2: "2RXS", nustar: "NuSTAR", bat: "BAT"};
+const RFLUX_ORDER = ["nvss", "sumss", "wenss"];
+let batch = null;
+
+function parseBatchList(text) {
+  const out = [];
+  for (const raw of text.split(/\r?\n/)) {
+    let s = raw.trim();
+    if (!s || s.startsWith("#")) continue;
+    if (!parseCoords(s) && /[,;\t]/.test(s)) s = s.split(/[,;\t]/)[0].trim();
+    s = s.replace(/^["']+|["']+$/g, "").trim();
+    if (s) out.push(s);
+  }
+  if (out.length && /^(names?|sources?|targets?|objects?|coord(inate)?s?|ra[ ,]*dec|input)$/i.test(out[0])) out.shift();
+  return out;
+}
+
+function bestHit(row, order) {
+  for (const k of order) { const r = row.cats[k]; if (r && r.hits.length) return {key: k, cat: r.cat, hit: r.hits[0]}; }
+  return null;
+}
+
+function batchHeader() {
+  const c = t("bCols");
+  return `<thead><tr><th>#</th><th>${c.input}</th><th>${c.name}</th><th class="num">RA</th><th class="num">Dec</th><th class="num">${c.total}</th>` +
+    MISSIONS.map((m) => `<th class="num">${SHORT[m.key] || m.label}</th>`).join("") +
+    `<th>${c.xflux}</th><th>${c.rflux}</th></tr></thead>`;
+}
+
+function batchRowHtml(r) {
+  const cells = [`<td>${r.i + 1}</td>`, `<td>${esc(r.input)}</td>`];
+  if (r.status === "pending") return `<tr>${cells.join("")}<td colspan="${4 + MISSIONS.length + 2}" class="muted"><span class="spin"></span></td></tr>`;
+  if (r.status === "fail") return `<tr>${cells.join("")}<td colspan="${4 + MISSIONS.length + 2}" class="err">${t("bNotFound")}</td></tr>`;
+  cells.push(`<td>${esc(r.main_id || "—")}</td><td class="num">${r.ra.toFixed(4)}</td><td class="num">${r.dec.toFixed(4)}</td>`);
+  if (r.status === "resolved") return `<tr class="ok" data-i="${r.i}">${cells.join("")}<td colspan="${1 + MISSIONS.length + 2}" class="muted"><span class="spin"></span></td></tr>`;
+  cells.push(`<td class="num"><b>${fmtInt(r.total)}</b></td>`);
+  MISSIONS.forEach((m) => {
+    const c = r.counts[m.key];
+    cells.push(c == null ? `<td class="num z">?</td>` : `<td class="num${c.n ? "" : " z"}">${fmtInt(c.n)}</td>`);
+  });
+  const x = bestHit(r, XFLUX_ORDER), rd = bestHit(r, RFLUX_ORDER);
+  cells.push(`<td>${x ? fmtFlux(x.hit.flux, null, null, x.cat.unit) + ` <span class="muted">${esc(CAT_SHORT[x.key] || x.cat.label)}</span>` : "—"}</td>`);
+  cells.push(`<td>${rd ? fmtFlux(rd.hit.flux, null, null, "mJy") + ` <span class="muted">${esc(rd.cat.label)}</span>` : "—"}</td>`);
+  return `<tr class="ok" data-i="${r.i}">${cells.join("")}</tr>`;
+}
+
+function renderBatch() {
+  if (!batch) return;
+  $("btable").innerHTML = batchHeader() + "<tbody>" + batch.rows.map(batchRowHtml).join("") + "</tbody>";
+}
+
+function updateBatchRow(r) {
+  const tr = $("btable").querySelectorAll("tbody tr")[r.i];
+  if (tr) tr.outerHTML = batchRowHtml(r);
+}
+
+function setBatchProgress(done, total, msg) {
+  $("bbar").style.width = (total ? (100 * done / total) : 0) + "%";
+  $("bstatus").textContent = msg || "";
+}
+
+async function resolveBatch(rows) {
+  const names = rows.filter((r) => !parseCoords(r.input));
+  rows.filter((r) => parseCoords(r.input)).forEach((r) => {
+    const c = parseCoords(r.input);
+    Object.assign(r, {status: "resolved", ra: c.ra, dec: c.dec, main_id: null, otype: ""});
+    updateBatchRow(r);
+  });
+  const CH = 40;
+  for (let k = 0; k < names.length && !batch.stopped; k += CH) {
+    setBatchProgress(k, names.length, t("bResolving")(Math.min(k + CH, names.length), names.length));
+    const chunk = names.slice(k, k + CH);
+    const s = await simbadScript(chunk.map((r) => "query id " + r.input.replace(/[\r\n]+/g, " ")).join("\n"), 60000);
+    const objs = s ? parseSimbadBatch(s.txt, chunk.length) : chunk.map(() => null);
+    chunk.forEach((r, i) => { if (objs[i]) Object.assign(r, {status: "resolved"}, objs[i]); });
+    chunk.forEach(updateBatchRow);
+  }
+  const missing = names.filter((r) => r.status === "pending");
+  await pool(missing, 4, async (r) => {
+    if (batch.stopped) return;
+    const o = await sesame(r.input);
+    Object.assign(r, o ? Object.assign({status: "resolved"}, o) : {status: "fail"});
+    updateBatchRow(r);
+  });
+}
+
+async function searchBatchRow(r, radius) {
+  const res = await Promise.all(MISSIONS.map((m) => queryMission(m, r.ra, r.dec, radius || m.radius).catch(() => null)));
+  r.counts = {};
+  res.forEach((x, i) => { r.counts[MISSIONS[i].key] = x && {n: x.n_done, planned: x.n_planned, expo: x.exposure_ks}; });
+  r.total = res.reduce((a, x) => a + (x ? x.n_done : 0), 0);
+  r.cats = {};
+  const cats = await Promise.all(CATMAN.catalogs.map((c) => queryCatalog(c, r.ra, r.dec).catch(() => null)));
+  cats.forEach((x, i) => { r.cats[CATMAN.catalogs[i].key] = x; });
+  r.status = "done";
+}
+
+async function runBatch() {
+  if (!MISSIONS.length || (batch && batch.running)) return;
+  const fixed = document.querySelector("input[name=rmode]:checked").value === "fixed";
+  const radius = fixed ? parseFloat($("radius").value) : null;
+  if (fixed && !(radius > 0 && radius <= MAX_RADIUS)) { $("bstatus").textContent = t("radiusErr"); return; }
+  setBatchProgress(0, 1, t("bParsing"));
+  let entries = parseBatchList($("btext").value);
+  if (!entries.length) { setBatchProgress(0, 1, t("bEmpty")); return; }
+  const note = entries.length > BATCH_MAX ? t("bTooMany")(entries.length) + " " : "";
+  entries = entries.slice(0, BATCH_MAX);
+  batch = {rows: entries.map((input, i) => ({i, input, status: "pending", cats: {}, counts: {}})), stopped: false, running: true, radius};
+  $("bgo").disabled = true; $("bcsv").disabled = true; $("bstop").classList.remove("hidden");
+  renderBatch();
+  await resolveBatch(batch.rows);
+  const todo = batch.rows.filter((r) => r.status === "resolved");
+  let done = 0;
+  await pool(todo, 4, async (r) => {
+    if (batch.stopped) return;
+    await searchBatchRow(r, radius);
+    updateBatchRow(r);
+    done++;
+    setBatchProgress(done, todo.length, note + t("bSearching")(done, todo.length));
+  });
+  const ok = batch.rows.filter((r) => r.status === "done").length;
+  setBatchProgress(1, 1, note + (batch.stopped ? t("bStopped") : t("bDone")(batch.rows.length, ok)));
+  batch.running = false;
+  $("bgo").disabled = false; $("bstop").classList.add("hidden"); $("bcsv").disabled = ok === 0;
+}
+
+function batchCsv() {
+  const q = (v) => { v = v == null ? "" : String(v); return /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v; };
+  const head = ["input", "status", "resolved_name", "object_type", "ra_deg", "dec_deg", "total_observations"];
+  MISSIONS.forEach((m) => head.push(`${m.key}_n`, `${m.key}_planned`, `${m.key}_exposure_ks`));
+  CATMAN.catalogs.forEach((c) => head.push(`${c.key}_name`, `${c.key}_flux_${(c.unit || "mJy").replace(/[^\w]+/g, "")}`,
+    `${c.key}_err_neg`, `${c.key}_err_pos`, `${c.key}_sep_arcsec`));
+  const lines = [head.join(",")];
+  for (const r of batch.rows) {
+    const row = [r.input, r.status === "done" ? "ok" : r.status === "fail" ? "not_found" : r.status, r.main_id, r.otype,
+      r.ra != null ? r.ra.toFixed(6) : "", r.dec != null ? r.dec.toFixed(6) : "", r.total];
+    MISSIONS.forEach((m) => { const c = r.counts[m.key]; row.push(c ? c.n : "", c ? c.planned : "", c ? c.expo : ""); });
+    CATMAN.catalogs.forEach((c) => {
+      const x = r.cats[c.key], h = x && x.hits[0];
+      row.push(h ? h.name : "", h ? h.flux : "", h ? h.eneg : "", h ? h.epos : "", h ? h.sep.toFixed(2) : "");
+    });
+    lines.push(row.map(q).join(","));
+  }
+  saveText("xray_batch_results.csv", lines.join("\n"));
+}
+
+function initBatch() {
+  $("batchToggle").addEventListener("click", () => {
+    $("batch").classList.toggle("hidden");
+    if (!$("batch").classList.contains("hidden")) $("batch").scrollIntoView({behavior: "smooth", block: "start"});
+  });
+  $("bfile").addEventListener("change", async (ev) => {
+    const f = ev.target.files[0];
+    if (!f) return;
+    $("btext").value = (await f.text()).slice(0, 2000000);
+  });
+  $("bgo").addEventListener("click", runBatch);
+  $("bstop").addEventListener("click", () => { if (batch) batch.stopped = true; });
+  $("bcsv").addEventListener("click", batchCsv);
+  $("btable").addEventListener("click", (ev) => {
+    const tr = ev.target.closest("tr.ok");
+    if (!tr || !batch) return;
+    const r = batch.rows[+tr.dataset.i];
+    const q = r.main_id && !parseCoords(r.input) ? r.input : `${r.ra.toFixed(6)} ${r.dec >= 0 ? "+" : ""}${r.dec.toFixed(6)}`;
+    $("q").value = q;
+    search(q);
+    $("form").scrollIntoView({behavior: "smooth", block: "start"});
+  });
 }
 
 // ---------------------------------------------------------------- main
@@ -919,7 +1478,7 @@ async function search(q) {
   if (fixed && !(radius > 0 && radius <= MAX_RADIUS)) { showStatus(t("radiusErr"), true); return; }
   syncUrl(q, radius);
   $("go").disabled = true;
-  ["source", "results"].forEach((id) => $(id).classList.add("hidden"));
+  ["source", "results", "images", "catalogs"].forEach((id) => $(id).classList.add("hidden"));
   $("legend").innerHTML = "";
   showStatus(`<span class="spin"></span> ${esc(t("resolving")(q))}`);
   let src;
@@ -930,11 +1489,13 @@ async function search(q) {
   }
   if (sid !== searchSeq) return;
   showStatus("");
-  state = {id: sid, src, radius, results: {}, surveys: {}, sdss: null, pendingPlots: []};
+  state = {id: sid, src, radius, results: {}, surveys: {}, sdss: null, cats: {}, pendingPlots: [], xrayPicked: false};
   renderSource(src);
   buildTable();
   renderTotal();
   $("results").classList.remove("hidden");
+  showPanels(src, sid);
+  runCatalogs(sid);
   showMap(src);
   runSurveys(sid);
   runSdss(sid);
@@ -964,8 +1525,9 @@ async function loadManifest() {
   const p = new URLSearchParams(location.search);
   if (p.get("r")) { document.querySelector("input[value=fixed]").checked = true; $("radius").value = p.get("r"); }
   if (p.get("q")) $("q").value = p.get("q");
+  initBatch();
   try {
-    const m = await loadManifest();
+    const [m] = await Promise.all([loadManifest(), loadCatManifest()]);
     MISSIONS = m.missions; SURVEYS = m.surveys;
     $("updated").textContent = t("updated")(m.updated);
   } catch (e) { showStatus(esc(t("noData")) + esc(e.message), true); return; }
