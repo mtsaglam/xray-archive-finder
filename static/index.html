@@ -4,7 +4,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>X-ray Archive Finder</title>
-<!--API_BASE-->
 <script type="module">
 import A from "https://cdn.jsdelivr.net/npm/aladin-lite@3.8.2/dist/aladin.js";
 window.A = A;
@@ -118,7 +117,7 @@ footer { margin-top: 28px; color: var(--muted); font-size: 12.5px; }
       <span data-i18n="radius"></span>
       <label><input type="radio" name="rmode" value="auto" checked> <span data-i18n="radiusAuto"></span></label>
       <label><input type="radio" name="rmode" value="fixed"> <span data-i18n="radiusFixed"></span>
-        <input type="number" id="radius" value="5" min="0.1" max="600" step="0.5"> <span data-i18n="arcmin"></span></label>
+        <input type="number" id="radius" value="5" min="0.1" max="300" step="0.5"> <span data-i18n="arcmin"></span></label>
       <span class="lang" style="margin-left:auto"><button type="button" data-lang="en">EN</button><button type="button" data-lang="tr">TR</button></span>
     </div>
     <div class="chips" id="examples"></div>
@@ -170,12 +169,16 @@ footer { margin-top: 28px; color: var(--muted); font-size: 12.5px; }
     </section>
   </div>
 
-  <footer data-i18n="footer"></footer>
+  <footer><span data-i18n="footer"></span> <span id="updated"></span></footer>
 </div>
 
 <script>
 "use strict";
-const API = (window.XRAY_API_BASE || "") + "api/";
+const DATA = window.XRAY_DATA_BASE || "data/";
+const SIMBAD_MIRRORS = ["https://simbad.cfa.harvard.edu/simbad", "https://simbad.cds.unistra.fr/simbad"];
+const SESAME = "https://cds.unistra.fr/cgi-bin/nph-sesame/-oxp/SNV?";
+const SDSS_BASE = "https://skyserver.sdss.org/dr17";
+const MAX_RADIUS = 300;
 const COLORS = ["#e6194b","#3cb44b","#4363d8","#f58231","#911eb4","#42d4f4","#f032e6","#bfef45","#fabed4",
   "#469990","#dcbeff","#9a6324","#fffac8","#800000","#aaffc3","#808000","#ffd8b1","#000075"];
 const EXAMPLES = ["Cyg X-1", "Mrk 421", "Sgr A*", "4U 1820-30", "Crab", "Ton 618", "19 58 21.67 +35 12 05.7"];
@@ -208,10 +211,10 @@ const I18N = {
     sdssTitle: "SDSS optical spectrum", sdssSearching: "Searching SDSS DR17…",
     sdssNone: "No SDSS DR17 spectrum within 3″ of this position.", sdssErr: "SDSS error: ",
     resolving: (q) => `Resolving “${q}”…`, notFound: "Source not found: ",
-    waking: "Waking up the server (free hosting sleeps when idle, this can take up to a minute)…",
-    noServer: "Could not reach the server: ", radiusErr: "Radius must be between 0 and 600 arcmin.",
+    noData: "Could not load the observation index: ", radiusErr: "Radius must be between 0 and 300 arcmin.",
     expoNote: {duration: "duration"},
-    footer: "Data: NASA HEASARC (TAP), SIMBAD (CDS / CfA mirror), SDSS DR17 SkyServer, HiPS surveys via Aladin Lite.",
+    footer: "Data: NASA HEASARC master tables (refreshed daily), SIMBAD (CfA / CDS), SDSS DR17 SkyServer, HiPS surveys via Aladin Lite.",
+    updated: (d) => `Observation index updated ${d}.`,
     locale: "en-US",
   },
   tr: {
@@ -241,10 +244,10 @@ const I18N = {
     sdssTitle: "SDSS optik spektrumu", sdssSearching: "SDSS DR17 aranıyor…",
     sdssNone: "Bu konumda (3″ içinde) SDSS DR17 spektrumu yok.", sdssErr: "SDSS hatası: ",
     resolving: (q) => `“${q}” çözümleniyor…`, notFound: "Kaynak bulunamadı: ",
-    waking: "Sunucu uyandırılıyor (ücretsiz sunucu boşta uyur, bir dakika kadar sürebilir)…",
-    noServer: "Sunucuya bağlanılamadı: ", radiusErr: "Yarıçap 0–600 yay dakikası olmalı.",
+    noData: "Gözlem dizini yüklenemedi: ", radiusErr: "Yarıçap 0–300 yay dakikası olmalı.",
     expoNote: {duration: "süre"},
-    footer: "Veri: NASA HEASARC (TAP), SIMBAD (CDS / CfA aynası), SDSS DR17 SkyServer, Aladin Lite ile HiPS haritaları.",
+    footer: "Veri: NASA HEASARC ana tabloları (her gün güncellenir), SIMBAD (CfA / CDS), SDSS DR17 SkyServer, Aladin Lite ile HiPS haritaları.",
+    updated: (d) => `Gözlem dizini güncelleme: ${d}.`,
     locale: "tr-TR",
   },
 };
@@ -344,6 +347,231 @@ function showStatus(html, isErr) {
   el.innerHTML = html;
   el.classList.toggle("hidden", !html);
   el.classList.toggle("err", !!isErr);
+}
+
+async function fetchTimeout(url, ms, opts) {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), ms);
+  try { return await fetch(url, Object.assign({signal: ctl.signal}, opts || {})); }
+  finally { clearTimeout(timer); }
+}
+
+// ---------------------------------------------------------------- astronomy helpers
+const D2R = Math.PI / 180;
+const todayMjd = () => Date.now() / 86400000 + 40587;
+const mjdToDate = (m) => (m == null ? null : new Date((m - 40587) * 86400000).toISOString().slice(0, 10));
+
+function sepDeg(ra1, de1, ra2, de2) {
+  const s = Math.sin((de2 - de1) * D2R / 2) ** 2 + Math.cos(de1 * D2R) * Math.cos(de2 * D2R) * Math.sin((ra2 - ra1) * D2R / 2) ** 2;
+  return 2 * Math.asin(Math.min(1, Math.sqrt(s))) / D2R;
+}
+
+function toGalactic(ra, dec) {
+  const R = [[-0.0548755604162154, -0.8734370902348850, -0.4838350155487132],
+             [0.4941094278755837, -0.4448296299600112, 0.7469822444972189],
+             [-0.8676661490190047, -0.1980763734312015, 0.4559837761750669]];
+  const v = [Math.cos(dec * D2R) * Math.cos(ra * D2R), Math.cos(dec * D2R) * Math.sin(ra * D2R), Math.sin(dec * D2R)];
+  const g = R.map((row) => row[0] * v[0] + row[1] * v[1] + row[2] * v[2]);
+  let l = Math.atan2(g[1], g[0]) / D2R;
+  if (l < 0) l += 360;
+  return [l, Math.asin(Math.max(-1, Math.min(1, g[2]))) / D2R];
+}
+
+function sexa(x, hours, prec) {
+  const sign = x < 0 ? "-" : (hours ? "" : "+");
+  let v = Math.abs(hours ? x / 15 : x);
+  let a = Math.floor(v), b = Math.floor((v - a) * 60), c = ((v - a) * 60 - b) * 60;
+  c = Number(c.toFixed(prec));
+  if (c >= 60) { c -= 60; b += 1; }
+  if (b >= 60) { b -= 60; a += 1; }
+  const p2 = (n) => String(n).padStart(2, "0");
+  return `${sign}${p2(a)}:${p2(b)}:${c.toFixed(prec).padStart(prec + 3, "0")}`;
+}
+
+function parseCoords(text) {
+  const tx = text.trim();
+  if (!/^[\s0-9+\-.:,hmsd°'"]+$/i.test(tx) || !/\d/.test(tx)) return null;
+  const plain = tx.replace(/,/g, " ").trim().split(/\s+/);
+  let ra, dec;
+  if (plain.length === 2 && plain.every((p) => /^[+-]?\d+(\.\d*)?$/.test(p))) {
+    ra = parseFloat(plain[0]); dec = parseFloat(plain[1]);
+  } else {
+    const tk = tx.replace(/[hmsd°'":,]/gi, " ").trim().split(/\s+/);
+    if (tk.length !== 6 || !tk.every((p) => /^[+-]?\d+(\.\d*)?$/.test(p))) return null;
+    const n = tk.map(Number);
+    if (n[1] >= 60 || n[2] >= 60 || n[4] >= 60 || n[5] >= 60) return null;
+    ra = (Math.abs(n[0]) + n[1] / 60 + n[2] / 3600) * 15;
+    dec = (Math.abs(n[3]) + n[4] / 60 + n[5] / 3600) * (tk[3].startsWith("-") ? -1 : 1);
+  }
+  if (!(ra >= 0 && ra < 360 && dec >= -90 && dec <= 90)) return null;
+  return {ra, dec};
+}
+
+// ---------------------------------------------------------------- name resolution (SIMBAD, Sesame fallback)
+const SIMBAD_FMT = 'format object "%MAIN_ID|%COO(d;A D)|%OTYPE(V)|%IDLIST[%*;]"';
+
+async function simbadScript(body) {
+  const script = "output console=off script=off\n" + SIMBAD_FMT + "\n" + body;
+  for (const base of SIMBAD_MIRRORS) {
+    try {
+      const r = await fetchTimeout(base + "/sim-script?script=" + encodeURIComponent(script), 25000);
+      if (!r.ok) continue;
+      const txt = await r.text();
+      if (/<html/i.test(txt.slice(0, 500))) continue;
+      return {base, txt};
+    } catch (e) { /* next mirror */ }
+  }
+  return null;
+}
+
+function parseSimbad(txt) {
+  if (txt.includes("::error::")) return [];
+  return txt.split("\n").map((line) => {
+    const p = line.split("|");
+    if (p.length < 4) return null;
+    const c = p[1].trim().split(/\s+/);
+    if (c.length !== 2 || isNaN(+c[0]) || isNaN(+c[1])) return null;
+    return {main_id: p[0].trim().replace(/\s+/g, " "), ra: +c[0], dec: +c[1], otype: p[2].trim(),
+      aliases: p[3].split(";").map((a) => a.trim().replace(/\s+/g, " ")).filter(Boolean)};
+  }).filter(Boolean);
+}
+
+async function sesame(name) {
+  try {
+    const r = await fetchTimeout(SESAME + encodeURIComponent(name), 25000);
+    const x = await r.text();
+    const g = (tag) => { const m = x.match(new RegExp(`<${tag}>([^<]+)</${tag}>`)); return m ? m[1].trim() : null; };
+    const ra = g("jradeg"), dec = g("jdedeg");
+    if (ra == null || dec == null) return null;
+    const res = x.match(/<Resolver name="([^"]+)"/);
+    return {main_id: g("oname") || name, ra: +ra, dec: +dec, otype: g("otype") || "", aliases: [],
+      resolver: res ? res[1] : "Sesame"};
+  } catch (e) { return null; }
+}
+
+async function resolveSource(q) {
+  q = q.replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim();
+  const out = {query: q};
+  const c = parseCoords(q);
+  if (c) {
+    Object.assign(out, {input_type: "coord", ra: c.ra, dec: c.dec, main_id: null, otype: null, aliases: [], resolver: "coordinates"});
+    const s = await simbadScript(`query coo ${c.ra.toFixed(7)} ${c.dec >= 0 ? "+" : ""}${c.dec.toFixed(7)} radius=10s`);
+    const objs = s ? parseSimbad(s.txt).map((o) => Object.assign(o, {sep_arcsec: sepDeg(c.ra, c.dec, o.ra, o.dec) * 3600})) : [];
+    out.nearest = objs.sort((a, b) => a.sep_arcsec - b.sep_arcsec)[0] || null;
+  } else {
+    let obj = null;
+    const s = await simbadScript("query id " + q);
+    if (s) {
+      obj = parseSimbad(s.txt)[0] || null;
+      if (obj) { obj.resolver = "SIMBAD"; out.simbad_url = s.base + "/sim-id?Ident=" + encodeURIComponent(obj.main_id); }
+    }
+    if (!obj) obj = await sesame(q);
+    if (!obj) throw new Error(`'${q}' (SIMBAD/NED/VizieR)`);
+    Object.assign(out, {input_type: "name"}, obj);
+  }
+  out.ra_hms = sexa(out.ra, true, 2);
+  out.dec_dms = sexa(out.dec, false, 1);
+  [out.l, out.b] = toGalactic(out.ra, out.dec);
+  return out;
+}
+
+// ---------------------------------------------------------------- observation index (static sky cells)
+let MANIFEST = null;
+const cellCache = new Map();
+
+function cellsForCircle(ra, dec, r) {
+  const size = MANIFEST.cell_deg, nRa = MANIFEST.n_ra, nDec = MANIFEST.n_dec;
+  const lo = Math.max(-90, dec - r), hi = Math.min(90, dec + r);
+  const iLo = Math.floor((lo + 90) / size), iHi = Math.min(nDec - 1, Math.floor((hi + 90) / size));
+  const maxAbs = Math.max(Math.abs(lo), Math.abs(hi));
+  const halfW = maxAbs >= 89.5 ? 180 : r / Math.cos(maxAbs * D2R) + 1e-6;
+  const out = [];
+  for (let i = iLo; i <= iHi; i++) {
+    if (halfW >= 180) { for (let j = 0; j < nRa; j++) out.push(i * nRa + j); continue; }
+    const jLo = Math.floor((ra - halfW) / size), jHi = Math.floor((ra + halfW) / size);
+    for (let j = jLo; j <= jHi; j++) out.push(i * nRa + (((j % nRa) + nRa) % nRa));
+  }
+  return [...new Set(out)];
+}
+
+function loadCell(key, idx) {
+  const url = `${DATA}${key}/${idx}.json`;
+  if (!cellCache.has(url)) {
+    const p = getJSON(url);
+    p.catch(() => cellCache.delete(url));
+    cellCache.set(url, p);
+  }
+  return cellCache.get(url);
+}
+
+async function queryMission(m, ra, dec, radiusArcmin) {
+  const r = radiusArcmin / 60;
+  const idxs = cellsForCircle(ra, dec, r).filter((i) => m.cellSet.has(i));
+  const cells = await Promise.all(idxs.map((i) => loadCell(m.key, i)));
+  const done = new Set(MANIFEST.done_statuses), now = todayMjd();
+  let obs = [];
+  for (const rows of cells) for (const row of rows) {
+    const off = sepDeg(ra, dec, row[0], row[1]);
+    if (off > r) continue;
+    if (m.grouped) { obs.push({ra: row[0], dec: row[1], id: row[2], mjd: row[3], expo: row[4], off}); continue; }
+    const status = m.statuses[row[6]] || "";
+    const isDone = done.has(status), pub = row[7];
+    const extra = {};
+    m.extra_keys.forEach((k, n) => { const v = row[8 + n]; if (v != null && v !== "") extra[k] = v; });
+    obs.push({id: row[2], name: row[5], mjd: row[3], date: mjdToDate(row[3]),
+      exposure_ks: row[4] == null ? null : Math.round(row[4] / 10) / 100, offset_arcmin: Math.round(off * 6000) / 100,
+      status: status || (isDone ? "archived" : ""), done: isDone, proprietary: isDone && pub != null && pub > now,
+      public_date: pub ? mjdToDate(pub) : null, ra: row[0], dec: row[1], extra,
+      link: m.link && isDone ? m.link.replace("{id}", row[2]) : null});
+  }
+  let nScw = null;
+  if (m.grouped) {
+    const groups = new Map();
+    for (const s of obs) {
+      const g = groups.get(s.id) || {id: s.id, n: 0, mjd: Infinity, expo: 0, off: Infinity, ra: 0, dec: 0};
+      g.n++; g.mjd = Math.min(g.mjd, s.mjd); g.expo += s.expo || 0; g.off = Math.min(g.off, s.off); g.ra += s.ra; g.dec += s.dec;
+      groups.set(s.id, g);
+    }
+    nScw = obs.length;
+    obs = [...groups.values()].map((g) => ({id: g.id, name: "", mjd: g.mjd, date: mjdToDate(g.mjd),
+      exposure_ks: Math.round(g.expo / 10) / 100, offset_arcmin: Math.round(g.off * 6000) / 100, status: "archived",
+      done: true, proprietary: false, public_date: null, ra: g.ra / g.n, dec: g.dec / g.n, extra: {ScW: g.n}, link: null}));
+  }
+  obs.sort((a, b) => (a.mjd == null) - (b.mjd == null) || (a.mjd || 0) - (b.mjd || 0));
+  const doneObs = obs.filter((o) => o.done);
+  const dates = doneObs.map((o) => o.date).filter(Boolean).sort();
+  return {key: m.key, label: m.label, radius_arcmin: radiusArcmin,
+    n_done: doneObs.length, n_planned: obs.length - doneObs.length, n_proprietary: obs.filter((o) => o.proprietary).length,
+    n_scw: nScw, exposure_ks: Math.round(doneObs.reduce((a, o) => a + (o.exposure_ks || 0), 0) * 10) / 10,
+    expo_note: m.expo_note, first: dates[0] || null, last: dates[dates.length - 1] || null, observations: obs};
+}
+
+let surveysData = null;
+async function querySurvey(key, ra, dec) {
+  if (!surveysData) surveysData = getJSON(DATA + "surveys.json").catch((e) => { surveysData = null; throw e; });
+  const d = await surveysData;
+  if (key === "erass1") {
+    const l = toGalactic(ra, dec)[0];
+    const inHalf = l > 179.9442 && l < 359.9442;
+    const tiles = inHalf ? d.erass1.filter(([, r0, r1, d0, d1]) =>
+      dec >= d0 && dec <= d1 && ((ra - r0) % 360 + 360) % 360 <= ((r1 - r0) % 360 + 360) % 360).map((x) => x[0]) : [];
+    return {covered: tiles.length > 0, fields: tiles, note: tiles.length ? null : "outside_dr1"};
+  }
+  const fields = d.rass.filter(([, fr, fd]) =>
+    Math.abs((((ra - fr + 180) % 360) + 360) % 360 - 180) * Math.cos(dec * D2R) <= 3.2 && Math.abs(dec - fd) <= 3.2).map((x) => x[0]);
+  return {covered: fields.length > 0, fields, note: null};
+}
+
+async function sdssSpectra(ra, dec) {
+  const cmd = "SELECT TOP 10 CAST(s.specobjid AS VARCHAR(24)) AS sid, s.class, s.subclass, s.z, s.plate, s.mjd, s.fiberid, " +
+    `s.survey, n.distance FROM dbo.fGetNearbySpecObjEq(${ra.toFixed(7)},${dec.toFixed(7)},0.05) n ` +
+    "JOIN specobj s ON s.specobjid = n.specobjid ORDER BY n.distance";
+  const r = await fetchTimeout(`${SDSS_BASE}/SkyServerWS/SearchTools/SqlSearch?format=json&cmd=${encodeURIComponent(cmd)}`, 40000);
+  if (!r.ok) throw new Error("HTTP " + r.status);
+  const rows = ((await r.json())[0] || {}).Rows || [];
+  return rows.map((s) => ({specobjid: s.sid, cls: s.class, subclass: s.subclass, z: s.z, plate: s.plate, mjd: s.mjd,
+    fiberid: s.fiberid, survey: s.survey, distance_arcsec: Math.round(s.distance * 6000) / 100,
+    image: `${SDSS_BASE}/en/get/SpecById.ashx?id=${s.sid}`, explore: `${SDSS_BASE}/VisualTools/explore/summary?sid=${s.sid}`}));
 }
 
 // ---------------------------------------------------------------- source card
@@ -477,10 +705,10 @@ async function runMission(key, sid) {
   const det = $("det-" + key);
   det.classList.add("hidden"); delete det.dataset.filled; row.classList.remove("open");
   renderTotal();
-  let url = `${API}mission/${key}?ra=${state.src.ra}&dec=${state.src.dec}`;
-  if (state.radius) url += `&radius=${state.radius}`;
+  const m = MISSIONS.find((x) => x.key === key);
   let res;
-  try { res = await getJSON(url); } catch (e) { res = {key, error: e.message}; }
+  try { res = await queryMission(m, state.src.ra, state.src.dec, state.radius || m.radius); }
+  catch (e) { res = {key, error: e.message}; }
   if (sid !== searchSeq) return;
   state.results[key] = res;
   renderRow(key);
@@ -504,7 +732,7 @@ async function runSurveys(sid) {
   renderSurveys();
   await Promise.all(SURVEYS.map(async (s) => {
     let r;
-    try { r = await getJSON(`${API}survey/${s.key}?ra=${state.src.ra}&dec=${state.src.dec}`); }
+    try { r = await querySurvey(s.key, state.src.ra, state.src.dec); }
     catch (e) { r = {error: e.message}; }
     if (sid !== searchSeq) return;
     state.surveys[s.key] = r;
@@ -531,7 +759,7 @@ function renderSdss() {
 async function runSdss(sid) {
   renderSdss();
   let r;
-  try { r = await getJSON(`${API}sdss?ra=${state.src.ra}&dec=${state.src.dec}`); }
+  try { r = {spectra: await sdssSpectra(state.src.ra, state.src.dec)}; }
   catch (e) { r = {error: e.message}; }
   if (sid !== searchSeq) return;
   state.sdss = r;
@@ -688,14 +916,14 @@ async function search(q) {
   const sid = ++searchSeq;
   const fixed = document.querySelector("input[name=rmode]:checked").value === "fixed";
   const radius = fixed ? parseFloat($("radius").value) : null;
-  if (fixed && !(radius > 0 && radius <= 600)) { showStatus(t("radiusErr"), true); return; }
+  if (fixed && !(radius > 0 && radius <= MAX_RADIUS)) { showStatus(t("radiusErr"), true); return; }
   syncUrl(q, radius);
   $("go").disabled = true;
   ["source", "results"].forEach((id) => $(id).classList.add("hidden"));
   $("legend").innerHTML = "";
   showStatus(`<span class="spin"></span> ${esc(t("resolving")(q))}`);
   let src;
-  try { src = await getJSON(API + "resolve?q=" + encodeURIComponent(q)); }
+  try { src = await resolveSource(q); }
   catch (e) {
     if (sid === searchSeq) { showStatus(esc(t("notFound")) + esc(e.message), true); $("go").disabled = false; }
     return;
@@ -714,17 +942,10 @@ async function search(q) {
   if (sid === searchSeq) $("go").disabled = false;
 }
 
-async function loadMissions() {
-  const start = Date.now();
-  let shown = false;
-  for (;;) {
-    try { return await getJSON(API + "missions"); }
-    catch (e) {
-      if (Date.now() - start > 150000) throw e;
-      if (!shown) { showStatus(`<span class="spin"></span> ${esc(t("waking"))}`); shown = true; }
-      await new Promise((r) => setTimeout(r, 4000));
-    }
-  }
+async function loadManifest() {
+  MANIFEST = await getJSON(DATA + "manifest.json");
+  MANIFEST.missions.forEach((m) => { m.cellSet = new Set(m.cells); });
+  return MANIFEST;
 }
 
 (async function boot() {
@@ -744,10 +965,10 @@ async function loadMissions() {
   if (p.get("r")) { document.querySelector("input[value=fixed]").checked = true; $("radius").value = p.get("r"); }
   if (p.get("q")) $("q").value = p.get("q");
   try {
-    const m = await loadMissions();
+    const m = await loadManifest();
     MISSIONS = m.missions; SURVEYS = m.surveys;
-    showStatus("");
-  } catch (e) { showStatus(esc(t("noServer")) + esc(e.message), true); return; }
+    $("updated").textContent = t("updated")(m.updated);
+  } catch (e) { showStatus(esc(t("noData")) + esc(e.message), true); return; }
   if (p.get("q")) search(p.get("q"));
   else if (window.self === window.top) $("q").focus();
 })();
