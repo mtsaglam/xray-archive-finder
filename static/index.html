@@ -91,8 +91,6 @@ tr.detail th, tr.detail td { padding: 5px 8px; }
 #aladin { width: 100%; height: 460px; border-radius: 10px; overflow: hidden; border: 1px solid var(--line); background: #000; }
 .mapctl { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-bottom: 10px; font-size: 14px; align-items: center; }
 .mapctl select { padding: 5px 6px; border-radius: 7px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); max-width: 100%; }
-.spec { margin-bottom: 14px; }
-.spec img { width: 100%; border-radius: 8px; border: 1px solid var(--line); background: #fff; }
 .legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12.5px; margin-top: 8px; color: var(--muted); }
 .note { font-size: 13px; margin: 10px 0 0; }
 footer { margin-top: 28px; color: var(--muted); font-size: 12.5px; }
@@ -120,6 +118,12 @@ table.btab th, table.btab td { padding: 5px 7px; }
 table.btab tr.ok { cursor: pointer; }
 table.btab tr.ok:hover td { background: var(--soft); }
 table.btab td.z { color: var(--zero); }
+.plot { width: 100%; min-height: 320px; }
+.plot.sq { max-width: 640px; aspect-ratio: 1 / 1; min-height: 0; }
+.plot.wide { height: 440px; }
+.plots2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-bottom: 4px; }
+@media (max-width: 860px) { .plots2 { grid-template-columns: 1fr; } }
+.row.dl { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin-top: 10px; }
 .hidden { display: none !important; }
 </style>
 </head>
@@ -210,8 +214,34 @@ table.btab td.z { color: var(--zero); }
     <p class="muted note" data-i18n="imgNote"></p>
   </section>
 
+  <section id="xr" class="card hidden">
+    <h2 data-i18n="xrTitle"></h2>
+    <div class="mapctl">
+      <label><span data-i18n="xrImage"></span> <select id="xrX"></select></label>
+      <label><span data-i18n="xrContours"></span> <select id="xrR"></select></label>
+      <label><span data-i18n="xrFov"></span> <select id="xrFov"><option>1</option><option>2</option><option>4</option><option>8</option><option>15</option><option>30</option></select>′</label>
+      <label><span data-i18n="xrSmooth"></span> <input type="range" id="xrSig" min="0" max="40" step="0.5" value="2"> <span id="xrSigV"></span>″</label>
+      <label><span data-i18n="xrStretch"></span> <select id="xrStr"><option value="asinh">asinh</option><option value="log">log</option><option value="sqrt">sqrt</option><option value="linear">linear</option></select></label>
+      <label><span data-i18n="xrLevels"></span> <select id="xrLev"><option value="3">3σ</option><option value="5">5σ</option><option value="10">10σ</option><option value="0">—</option></select></label>
+    </div>
+    <div id="xrPlot" class="plot sq"></div>
+    <div class="row dl">
+      <button type="button" id="xrPng" data-i18n="dlPng"></button>
+      <button type="button" id="xrFitsX" data-i18n="dlFitsX"></button>
+      <button type="button" id="xrFitsR" data-i18n="dlFitsR"></button>
+      <span id="xrStatus" class="muted" style="font-size:13px"></span>
+    </div>
+    <p class="muted note" id="xrInfo"></p>
+    <p class="muted note" data-i18n="xrNote"></p>
+  </section>
+
   <section id="catalogs" class="card hidden">
     <h2 data-i18n="catTitle"></h2>
+    <div class="plots2">
+      <div><div class="subhead" data-i18n="fxTitle"></div><div id="fxPlot" class="plot"></div></div>
+      <div><div class="subhead" data-i18n="frTitle"></div><div id="frPlot" class="plot"></div></div>
+    </div>
+    <p class="muted note" data-i18n="fluxPlotNote"></p>
     <div class="subhead" data-i18n="catX"></div>
     <div class="tablewrap"><table class="cat" id="catx"></table></div>
     <div class="subhead" data-i18n="catRadio"></div>
@@ -219,7 +249,22 @@ table.btab td.z { color: var(--zero); }
     <p class="muted note" data-i18n="catNote"></p>
   </section>
 
-  <div class="two hidden" id="extras">
+  <section id="spec" class="card hidden">
+    <h2 data-i18n="sdssTitle"></h2>
+    <div id="sdss" class="muted">—</div>
+    <div id="specCtl" class="mapctl hidden" style="margin-top:8px">
+      <label><span data-i18n="spWhich"></span> <select id="spSel"></select></label>
+      <label><span data-i18n="spSmooth"></span> <select id="spBox"><option value="1">—</option><option value="3">3 px</option><option value="5" selected>5 px</option><option value="9">9 px</option><option value="15">15 px</option></select></label>
+      <label><input type="checkbox" id="spRest"> <span data-i18n="spRest"></span></label>
+      <label><input type="checkbox" id="spLines" checked> <span data-i18n="spLines"></span></label>
+      <label><input type="checkbox" id="spModel" checked> <span data-i18n="spModel"></span></label>
+      <button type="button" id="spCsv" data-i18n="dlCsv"></button>
+    </div>
+    <div id="spPlot" class="plot wide hidden"></div>
+    <p class="muted note" id="spInfo"></p>
+  </section>
+
+  <div class="hidden" id="extras">
     <section class="card">
       <h2 data-i18n="fieldTitle"></h2>
       <div class="mapctl">
@@ -231,10 +276,6 @@ table.btab td.z { color: var(--zero); }
       <div id="aladin"></div>
       <div class="legend" id="legend"></div>
       <p class="muted note" data-i18n="mapNote"></p>
-    </section>
-    <section class="card">
-      <h2 data-i18n="sdssTitle"></h2>
-      <div id="sdss" class="muted">—</div>
     </section>
   </div>
 
@@ -293,11 +334,24 @@ const I18N = {
     bDone: (n, ok) => `Done: ${ok} of ${n} sources resolved.`, bStopped: "Stopped.", bEmpty: "The list is empty.",
     bTooMany: (n) => `Only the first 500 of ${n} lines are used.`, bCols: {input: "Input", name: "Resolved", total: "Total obs.", xflux: "X-ray flux", rflux: "Radio (mJy)"},
     bNotFound: "not found",
+    xrTitle: "X-ray image with radio contours", xrImage: "X-ray image", xrContours: "Radio contours", xrFov: "Field",
+    xrSmooth: "Smoothing σ", xrStretch: "Stretch", xrLevels: "Lowest contour",
+    xrNote: "The X-ray image and the radio map are read pixel by pixel from the survey HiPS tiles and resampled onto the same tangent-plane grid centred on the source (east left, north up). Contours start at the chosen multiple of the radio map's robust rms and double at each level. Chandra and XMM-Newton images are colour composites converted to relative intensity, so they show morphology but not calibrated counts; Swift-XRT and eROSITA are counts maps. FITS downloads are the unsmoothed cutouts with a TAN WCS header.",
+    xrLoading: "Reading survey tiles…", xrNoData: "No data from this survey at this position.", xrNoContours: "no radio emission above the lowest contour",
+    xrInfo: (a) => `X-ray: ${a.x} (pixel ${a.xp}″). Radio: ${a.r}${a.rp ? ` (pixel ${a.rp}″, rms ${a.rms} mJy/beam, contours from ${a.l0} mJy/beam ×2ⁿ)` : ""}.`,
+    xrSrc: "source position", dlPng: "Download PNG", dlFitsX: "X-ray FITS", dlFitsR: "Radio FITS", dlCsv: "Download CSV",
+    fxTitle: "X-ray catalogue fluxes", frTitle: "Radio spectrum",
+    fluxPlotNote: "X-ray points are band-integrated fluxes drawn across each catalogue's energy band (INTEGRAL converted with 1 mCrab = 7.57×10⁻¹² erg/s/cm² in 20–40 keV); bands differ, so values are not directly comparable. The radio fit is a weighted power law S ∝ ν^α over the plotted points; catalogues differ in resolution and epoch, so variable or extended sources can scatter.",
+    noFluxes: "No catalogue fluxes to plot.", alphaFit: (a, e) => `α = ${a} ± ${e}`,
+    sdssTitle: "Optical spectrum (SDSS / BOSS / DESI)", spWhich: "Spectrum", spSmooth: "Smoothing", spRest: "Rest frame",
+    spLines: "Line markers", spModel: "Pipeline model", spSearching: "Searching SDSS, BOSS and DESI spectra (NOIRLab SPARCL)…",
+    spLoading: "Loading spectrum…", spNone: "No SDSS, BOSS or DESI spectrum within 3″ of this position.",
+    spErr: "Spectrum service error: ", spInfo: (s) => `${s.dr} · ${s.type} · z = ${s.z} · ${s.sep}″ from the position · ${s.n} pixels.`,
+    spWave: (rest) => (rest ? "Rest-frame wavelength (Å)" : "Observed wavelength (Å)"), spFlux: "Flux (10⁻¹⁷ erg/s/cm²/Å)",
+    spLinks: "Open in", spFallback: "Spectrum data unavailable right now; SkyServer lists:",
     groups: {opt: "Optical", x: "X-ray", radio: "Radio"}, color: "color",
     mapNote: "Markers show observation pointing centres (toggle layers from the menu at the top left of the map). Aladin Lite / HiPS.",
     aladinFail: "Aladin Lite could not be loaded",
-    sdssTitle: "SDSS optical spectrum", sdssSearching: "Searching SDSS DR17…",
-    sdssNone: "No SDSS DR17 spectrum within 3″ of this position.", sdssErr: "SDSS error: ",
     resolving: (q) => `Resolving “${q}”…`, notFound: "Source not found: ",
     noData: "Could not load the observation index: ", radiusErr: "Radius must be between 0 and 300 arcmin.",
     expoNote: {duration: "duration"},
@@ -345,11 +399,24 @@ const I18N = {
     bDone: (n, ok) => `Bitti: ${n} kaynağın ${ok} tanesi çözümlendi.`, bStopped: "Durduruldu.", bEmpty: "Liste boş.",
     bTooMany: (n) => `${n} satırın yalnızca ilk 500'ü kullanılıyor.`, bCols: {input: "Girdi", name: "Çözümlenen", total: "Toplam gözlem", xflux: "X-ray akısı", rflux: "Radyo (mJy)"},
     bNotFound: "bulunamadı",
+    xrTitle: "Radyo konturlu X-ray görüntüsü", xrImage: "X-ray görüntüsü", xrContours: "Radyo konturları", xrFov: "Alan",
+    xrSmooth: "Yumuşatma σ", xrStretch: "Ölçek", xrLevels: "En düşük kontur",
+    xrNote: "X-ray görüntüsü ve radyo haritası, taramaların HiPS karolarından piksel piksel okunup kaynağa ortalanmış aynı teğet düzlem ızgarasına yeniden örneklenir (doğu solda, kuzey yukarıda). Konturlar radyo haritasının gürbüz rms değerinin seçilen katından başlar ve her seviyede ikiye katlanır. Chandra ve XMM-Newton görüntüleri renkli kompozitlerden göreli parlaklığa çevrilir; morfolojiyi gösterir ama kalibre sayım değildir. Swift-XRT ve eROSITA sayım haritalarıdır. FITS indirmeleri, TAN WCS başlıklı yumuşatılmamış kesitlerdir.",
+    xrLoading: "Tarama karoları okunuyor…", xrNoData: "Bu taramanın bu konumda verisi yok.", xrNoContours: "en düşük konturun üzerinde radyo salınımı yok",
+    xrInfo: (a) => `X-ray: ${a.x} (piksel ${a.xp}″). Radyo: ${a.r}${a.rp ? ` (piksel ${a.rp}″, rms ${a.rms} mJy/beam, konturlar ${a.l0} mJy/beam ×2ⁿ)` : ""}.`,
+    xrSrc: "kaynak konumu", dlPng: "PNG indir", dlFitsX: "X-ray FITS", dlFitsR: "Radyo FITS", dlCsv: "CSV indir",
+    fxTitle: "X-ray katalog akıları", frTitle: "Radyo spektrumu",
+    fluxPlotNote: "X-ray noktaları, her kataloğun enerji bandı boyunca çizilen bant akılarıdır (INTEGRAL için 20–40 keV'de 1 mCrab = 7,57×10⁻¹² erg/s/cm² kullanıldı); bantlar farklı olduğu için değerler doğrudan karşılaştırılamaz. Radyo uyumu, çizilen noktalara ağırlıklı S ∝ ν^α kuvvet yasasıdır; kataloglar çözünürlük ve gözlem dönemi bakımından farklı olduğundan değişken veya genişlemiş kaynaklarda saçılma olabilir.",
+    noFluxes: "Çizilecek katalog akısı yok.", alphaFit: (a, e) => `α = ${a} ± ${e}`,
+    sdssTitle: "Optik spektrum (SDSS / BOSS / DESI)", spWhich: "Spektrum", spSmooth: "Yumuşatma", spRest: "Durgun çerçeve",
+    spLines: "Çizgi işaretleri", spModel: "Boru hattı modeli", spSearching: "SDSS, BOSS ve DESI spektrumları aranıyor (NOIRLab SPARCL)…",
+    spLoading: "Spektrum yükleniyor…", spNone: "Bu konumda (3″ içinde) SDSS, BOSS veya DESI spektrumu yok.",
+    spErr: "Spektrum servisi hatası: ", spInfo: (s) => `${s.dr} · ${s.type} · z = ${s.z} · konumdan ${s.sep}″ · ${s.n} piksel.`,
+    spWave: (rest) => (rest ? "Durgun çerçeve dalga boyu (Å)" : "Gözlenen dalga boyu (Å)"), spFlux: "Akı (10⁻¹⁷ erg/s/cm²/Å)",
+    spLinks: "Aç:", spFallback: "Spektrum verisi şu an alınamıyor; SkyServer listesi:",
     groups: {opt: "Optik", x: "X-ray", radio: "Radyo"}, color: "renkli",
     mapNote: "Noktalar gözlemlerin yönelim merkezleridir (katmanlar haritanın sol üstündeki menüden açılıp kapatılabilir). Aladin Lite / HiPS.",
     aladinFail: "Aladin Lite yüklenemedi",
-    sdssTitle: "SDSS optik spektrumu", sdssSearching: "SDSS DR17 aranıyor…",
-    sdssNone: "Bu konumda (3″ içinde) SDSS DR17 spektrumu yok.", sdssErr: "SDSS hatası: ",
     resolving: (q) => `“${q}” çözümleniyor…`, notFound: "Kaynak bulunamadı: ",
     noData: "Gözlem dizini yüklenemedi: ", radiusErr: "Yarıçap 0–300 yay dakikası olmalı.",
     expoNote: {duration: "süre"},
@@ -440,8 +507,11 @@ function setLang(l) {
   });
   renderTotal();
   renderSurveys();
-  renderSdss();
+  if (state.spec && state.spec.list && state.spec.list.length) drawSpectrum();
+  else if (!$("spec").classList.contains("hidden")) renderSpecList();
   renderCatalogs();
+  scheduleFluxPlots();
+  if (state.xr && state.xr.xc) { fillCutSelects(); drawXr(); }
 }
 
 if (window.self !== window.top) {
@@ -954,30 +1024,186 @@ async function runSurveys(sid) {
   }));
 }
 
-function renderSdss() {
-  const el = $("sdss");
-  const r = state.sdss;
-  el.classList.add("muted");
-  if (!r) { el.innerHTML = `<span class="spin"></span> ${t("sdssSearching")}`; return; }
-  if (r.error) { el.innerHTML = `<span class="err">${t("sdssErr")}${esc(r.error)}</span>`; return; }
-  if (!r.spectra.length) { el.textContent = t("sdssNone"); return; }
-  el.classList.remove("muted");
-  el.innerHTML = r.spectra.map((s) => `
-    <div class="spec">
-      <div style="margin-bottom:6px"><b>${esc(s.cls)}</b> ${esc(s.subclass || "")} · z = ${Number(s.z).toFixed(5)} ·
-        <span class="muted">plate-mjd-fiber ${esc(s.plate)}-${esc(s.mjd)}-${esc(s.fiberid)} · ${esc(s.survey)} · ${fmt(s.distance_arcsec, 2)}″</span></div>
-      <a href="${esc(s.explore)}" target="_blank" rel="noopener"><img src="${esc(s.image)}" alt="SDSS ${esc(s.specobjid)}"></a>
-    </div>`).join("");
+// ---------------------------------------------------------------- plotting (Plotly, loaded on demand)
+const PLOTLY_URL = "https://cdn.jsdelivr.net/npm/plotly.js-cartesian-dist-min@2.35.2/plotly-cartesian.min.js";
+let plotlyReady = null;
+
+function loadPlotly() {
+  if (!plotlyReady) {
+    plotlyReady = new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = PLOTLY_URL;
+      // Aladin Lite overwrites the global `self`, and Plotly's UMD wrapper registers itself on `self`.
+      s.onload = () => {
+        const P = window.Plotly || (window.self && window.self.Plotly);
+        if (!P) { plotlyReady = null; reject(new Error("Plotly could not be loaded")); return; }
+        window.Plotly = P;
+        resolve(P);
+      };
+      s.onerror = () => { plotlyReady = null; reject(new Error("Plotly could not be loaded")); };
+      document.head.append(s);
+    });
+  }
+  return plotlyReady;
 }
 
-async function runSdss(sid) {
-  renderSdss();
-  let r;
-  try { r = {spectra: await sdssSpectra(state.src.ra, state.src.dec)}; }
-  catch (e) { r = {error: e.message}; }
+function plotTheme(extra) {
+  const css = getComputedStyle(document.documentElement);
+  const v = (n) => css.getPropertyValue(n).trim();
+  const axis = {gridcolor: v("--line"), zerolinecolor: v("--line"), linecolor: v("--line"), color: v("--muted")};
+  return Object.assign({paper_bgcolor: "rgba(0,0,0,0)", plot_bgcolor: "rgba(0,0,0,0)", font: {color: v("--ink"), size: 12},
+    margin: {l: 64, r: 16, t: 16, b: 52}, xaxis: Object.assign({}, axis), yaxis: Object.assign({}, axis),
+    legend: {font: {size: 11}}, hoverlabel: {font: {size: 12}}}, extra || {});
+}
+
+const PLOT_CONFIG = {responsive: true, displaylogo: false, modeBarButtonsToRemove: ["lasso2d", "select2d"]};
+
+// ---------------------------------------------------------------- optical spectrum (SPARCL: SDSS / BOSS / DESI)
+const SPARCL = "https://astrosparcl.datalab.noirlab.edu/api";
+const SPEC_LINES = [["Lyα", 1215.67], ["N V", 1240.1], ["Si IV", 1398], ["C IV", 1549.1], ["C III]", 1908.7], ["Mg II", 2798.8],
+  ["[O II]", 3727.4], ["Ca K", 3933.7], ["Ca H", 3968.5], ["Hδ", 4101.7], ["Hγ", 4340.5], ["Hβ", 4861.3], ["[O III]", 4958.9],
+  ["[O III]", 5006.8], ["Mg b", 5175.3], ["Na D", 5892.9], ["[O I]", 6300.3], ["Hα", 6562.8], ["[N II]", 6583.5], ["[S II]", 6716.4],
+  ["[S II]", 6730.8], ["Ca II", 8542.1]];
+
+async function sparclPost(path, body, timeout) {
+  const r = await fetchTimeout(SPARCL + path, timeout, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)});
+  if (!r.ok) throw new Error("SPARCL HTTP " + r.status);
+  // specid is a 64-bit integer: keep it as text so it survives JSON parsing
+  return JSON.parse((await r.text()).replace(/"specid":\s*(-?\d+)/g, '"specid":"$1"'));
+}
+
+async function findSpectra(ra, dec) {
+  const r = 3 / 3600, dra = r / Math.max(Math.cos(dec * D2R), 1e-3);
+  const ranges = ra - dra < 0 ? [[0, ra + dra], [360 + ra - dra, 360]]
+    : ra + dra >= 360 ? [[ra - dra, 360], [0, ra + dra - 360]] : [[ra - dra, ra + dra]];
+  const found = [];
+  for (const [a, b] of ranges) {
+    const d = await sparclPost("/find/?limit=50", {outfields: ["sparcl_id", "specid", "data_release", "redshift", "spectype", "ra", "dec"],
+      search: [["ra", a, b], ["dec", dec - r, dec + r]]}, 30000);
+    found.push(...d.slice(1));
+  }
+  return found.map((s) => Object.assign(s, {sep: sepDeg(ra, dec, s.ra, s.dec) * 3600}))
+    .filter((s) => s.sep <= 3).sort((a, b) => a.sep - b.sep);
+}
+
+async function loadSpectrum(rec) {
+  if (!rec.data) {
+    rec.data = sparclPost("/spectras/?include=sparcl_id,flux,ivar,model,wavelength&format=json", [rec.sparcl_id], 60000)
+      .then((d) => d[1]).catch((e) => { rec.data = null; throw e; });
+  }
+  return rec.data;
+}
+
+function boxcar(a, n) {
+  if (n <= 1) return a;
+  const h = Math.floor(n / 2), out = new Array(a.length);
+  for (let i = 0; i < a.length; i++) {
+    let s = 0, c = 0;
+    for (let k = Math.max(0, i - h); k <= Math.min(a.length - 1, i + h); k++) if (Number.isFinite(a[k])) { s += a[k]; c++; }
+    out[i] = c ? s / c : null;
+  }
+  return out;
+}
+
+function quantile(arr, q) {
+  const v = arr.filter(Number.isFinite).sort((a, b) => a - b);
+  if (!v.length) return NaN;
+  return v[Math.min(v.length - 1, Math.max(0, Math.floor(q * (v.length - 1))))];
+}
+
+function specLinks(rec) {
+  const links = [];
+  if (/SDSS|BOSS/.test(rec.data_release) && rec.specid) links.push(["SkyServer", `${SDSS_BASE}/VisualTools/explore/summary?sid=${rec.specid}`]);
+  links.push(["Legacy Survey viewer", `https://www.legacysurvey.org/viewer?ra=${rec.ra.toFixed(5)}&dec=${rec.dec.toFixed(5)}&layer=ls-dr10&zoom=16`]);
+  return links;
+}
+
+async function drawSpectrum() {
+  const sp = state && state.spec;
+  if (!sp || !sp.list || !sp.list.length) return;
+  const rec = sp.list[+$("spSel").value || 0];
+  const zRaw = Number(rec.redshift);
+  $("spInfo").innerHTML = esc(t("spLoading"));
+  let d, P;
+  try { [d, P] = await Promise.all([loadSpectrum(rec), loadPlotly()]); }
+  catch (e) { $("spInfo").innerHTML = `<span class="err">${esc(t("spErr") + e.message)}</span>`; return; }
+  if (state.spec !== sp) return;
+  const rest = $("spRest").checked, z = Number.isFinite(zRaw) ? zRaw : 0;
+  const wl = d.wavelength.map((w) => (rest ? w / (1 + z) : w));
+  const flux = d.flux.map((f, i) => (d.ivar && d.ivar[i] > 0 ? f : null));
+  const sm = boxcar(flux, +$("spBox").value);
+  const lo = quantile(sm, 0.005), hi = quantile(sm, 0.995), pad = 0.12 * (hi - lo || 1);
+  const traces = [{x: wl, y: flux, type: "scatter", mode: "lines", name: "flux", line: {color: "rgba(120,140,170,.45)", width: 1},
+    hovertemplate: "λ %{x:.1f} Å<br>%{y:.3g}<extra>flux</extra>"}];
+  if (+$("spBox").value > 1) traces.push({x: wl, y: sm, type: "scatter", mode: "lines", name: `${$("spBox").value} px`, line: {color: "#1f5fae", width: 1.4}, hoverinfo: "skip"});
+  if ($("spModel").checked && d.model) traces.push({x: wl, y: d.model, type: "scatter", mode: "lines", name: "model", line: {color: "#d62728", width: 1.1}, hovertemplate: "λ %{x:.1f} Å<br>%{y:.3g}<extra>model</extra>"});
+  const shapes = [], annotations = [];
+  if ($("spLines").checked && Number.isFinite(zRaw)) {
+    const [w0, w1] = [wl[0], wl[wl.length - 1]];
+    SPEC_LINES.forEach(([name, lam], k) => {
+      const x = rest ? lam : lam * (1 + z);
+      if (x < w0 || x > w1) return;
+      shapes.push({type: "line", x0: x, x1: x, yref: "paper", y0: 0, y1: 1, line: {color: "rgba(214,39,40,.35)", width: 1, dash: "dot"}});
+      annotations.push({x, yref: "paper", y: k % 2 ? 0.93 : 0.99, text: name, showarrow: false, font: {size: 10, color: "#d62728"}, textangle: -90, xanchor: "right"});
+    });
+  }
+  const layout = plotTheme({shapes, annotations, showlegend: true, legend: {orientation: "h", y: -0.2},
+    margin: {l: 64, r: 16, t: 10, b: 70}});
+  layout.xaxis.title = {text: t("spWave")(rest)};
+  layout.yaxis.title = {text: t("spFlux")};
+  layout.yaxis.range = [lo - pad, hi + pad];
+  $("spPlot").classList.remove("hidden");
+  await P.react("spPlot", traces, layout, PLOT_CONFIG);
+  const links = specLinks(rec).map(([n, u]) => `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(n)}</a>`).join(" · ");
+  $("spInfo").innerHTML = esc(t("spInfo")({dr: rec.data_release, type: rec.spectype || "?", z: Number.isFinite(zRaw) ? zRaw.toFixed(5) : "?",
+    sep: rec.sep.toFixed(2), n: d.wavelength.length})) + ` ${esc(t("spLinks"))} ${links}`;
+}
+
+function renderSpecList() {
+  const sp = state.spec, el = $("sdss");
+  $("specCtl").classList.add("hidden");
+  $("spPlot").classList.add("hidden");
+  $("spInfo").textContent = "";
+  el.classList.add("muted");
+  if (!sp) { el.innerHTML = `<span class="spin"></span> ${esc(t("spSearching"))}`; return; }
+  if (sp.list && !sp.list.length) { el.textContent = t("spNone"); return; }
+  if (sp.list) {
+    el.textContent = "";
+    $("spSel").innerHTML = sp.list.map((s, i) => `<option value="${i}">${esc(s.data_release)} · ${esc(s.spectype || "?")} · z=${Number(s.redshift).toFixed(4)} · ${s.sep.toFixed(1)}″</option>`).join("");
+    $("specCtl").classList.remove("hidden");
+    drawSpectrum();
+    return;
+  }
+  // SPARCL failed: list what SkyServer knows, with links
+  el.innerHTML = `<span class="err">${esc(t("spErr") + sp.error)}</span>` + (sp.fallback && sp.fallback.length
+    ? `<div style="margin-top:6px">${esc(t("spFallback"))} ` + sp.fallback.map((s) =>
+      `<a href="${esc(s.explore)}" target="_blank" rel="noopener">${esc(s.cls)} z=${Number(s.z).toFixed(4)} (${esc(s.survey)})</a>`).join(" · ") + "</div>" : "");
+}
+
+async function runSpectra(sid) {
+  $("spec").classList.remove("hidden");
+  state.spec = null;
+  renderSpecList();
+  let sp;
+  try { sp = {list: await findSpectra(state.src.ra, state.src.dec)}; }
+  catch (e) {
+    sp = {error: e.message};
+    try { sp.fallback = await sdssSpectra(state.src.ra, state.src.dec); } catch (e2) { sp.fallback = []; }
+  }
   if (sid !== searchSeq) return;
-  state.sdss = r;
-  renderSdss();
+  state.spec = sp;
+  renderSpecList();
+}
+
+function spectrumCsv() {
+  const sp = state && state.spec;
+  if (!sp || !sp.list) return;
+  const rec = sp.list[+$("spSel").value || 0];
+  loadSpectrum(rec).then((d) => {
+    const lines = ["wavelength_A,flux_1e-17_erg_s_cm2_A,ivar,model"];
+    d.wavelength.forEach((w, i) => lines.push([w, d.flux[i], d.ivar ? d.ivar[i] : "", d.model ? d.model[i] : ""].join(",")));
+    saveText(`spectrum_${rec.data_release}_${rec.sparcl_id}.csv`, lines.join("\n"));
+  });
 }
 
 // ---------------------------------------------------------------- Aladin
@@ -1257,7 +1483,485 @@ async function runCatalogs(sid) {
     if (sid !== searchSeq) return;
     state.cats[c.key] = r;
     renderCatalogs();
+    scheduleFluxPlots();
   }));
+  if (sid === searchSeq && state.xr && state.xr.xc) drawXr();
+}
+
+// ---------------------------------------------------------------- HiPS pixel cutouts (HEALPix nested, read in the browser)
+// Survey pixels for the X-ray image and the radio contours. dec = declination coverage.
+const CUT = {
+  x: [
+    {id: "chandra", label: {en: "Chandra (RGB composite → relative intensity)", tr: "Chandra (RGB kompozit → göreli parlaklık)"}, bases: ["https://cdaftp.cfa.harvard.edu/cxc-hips"], fmt: "png", unit: "rel.", fov: 4, sig: 1},
+    {id: "xmm", label: {en: "XMM-Newton EPIC (RGB composite → relative intensity)", tr: "XMM-Newton EPIC (RGB kompozit → göreli parlaklık)"}, bases: ["https://esdchips.esac.esa.int/XMM-Newton/EPIC-RGB"], fmt: "jpg", unit: "rel.", fov: 8, sig: 4},
+    {id: "swift", label: {en: "Swift-XRT stacked (counts)", tr: "Swift-XRT birleşik (sayım)"}, bases: ["https://skyview.gsfc.nasa.gov/surveys/xrt/cnt/all_clipped"], fmt: "fits", unit: "counts", fov: 8, sig: 6},
+    {id: "erosita", label: {en: "eROSITA DR1 0.2–2.3 keV (counts)", tr: "eROSITA DR1 0.2–2.3 keV (sayım)"}, bases: ["https://erosita.mpe.mpg.de/erodat/static/hips/eRASS1_024_Image_c010"], fmt: "fits", unit: "counts", fov: 15, sig: 12},
+  ],
+  radio: [
+    {id: "racsmid", label: "RACS-mid 1.37 GHz", bases: ["https://casda.csiro.au/hips/RACS/mid/I"], fmt: "fits", unit: "Jy/beam", dec: [-90, 49]},
+    {id: "nvss", label: "NVSS 1.4 GHz", bases: ["https://casda.csiro.au/hips/NVSS", "https://hips.china-vo.org/m/CDS_P_NVSS"], fmt: "fits", unit: "Jy/beam", dec: [-40, 90]},
+    {id: "racslow", label: "RACS-low 888 MHz", bases: ["https://casda.csiro.au/hips/RACS/low/I"], fmt: "fits", unit: "Jy/beam", dec: [-90, 30]},
+    {id: "sumss", label: "SUMSS 843 MHz", bases: ["https://casda.csiro.au/hips/SUMSS"], fmt: "fits", unit: "Jy/beam", dec: [-90, -30]},
+  ],
+};
+const CUT_BY_ID = Object.fromEntries([...CUT.x, ...CUT.radio].map((s) => [s.id, s]));
+const cutLabel = (s, l) => (typeof s.label === "string" ? s.label : s.label[l || lang] || s.label.en);
+const INFERNO = [[0, "#000004"], [0.13, "#1b0c41"], [0.25, "#4a0c6b"], [0.38, "#781c6d"], [0.5, "#a52c60"], [0.63, "#cf4446"],
+  [0.75, "#ed6925"], [0.88, "#fb9b06"], [1, "#fcffa4"]];
+const CUT_N = 200;
+const propsCache = {}, tileCache = new Map();
+
+function ang2xyf(order, ra, dec) {
+  const nside = 2 ** order, z = Math.sin(dec * D2R), za = Math.abs(z);
+  let tt = ((ra % 360) + 360) % 360 / 90;
+  if (tt >= 4) tt = 0;
+  if (za <= 2 / 3) {
+    const t1 = nside * (0.5 + tt), t2 = nside * z * 0.75;
+    const jp = Math.floor(t1 - t2), jm = Math.floor(t1 + t2);
+    const ifp = Math.floor(jp / nside), ifm = Math.floor(jm / nside);
+    const face = ifp === ifm ? (ifp | 4) : (ifp < ifm ? ifp : ifm + 8);
+    return [face, jm & (nside - 1), nside - (jp & (nside - 1)) - 1];
+  }
+  const ntt = Math.min(3, Math.floor(tt)), tp = tt - ntt, tmp = nside * Math.sqrt(3 * (1 - za));
+  const jp = Math.min(Math.floor(tp * tmp), nside - 1), jm = Math.min(Math.floor((1 - tp) * tmp), nside - 1);
+  return z >= 0 ? [ntt, nside - jm - 1, nside - jp - 1] : [ntt + 8, jp, jm];
+}
+
+function interleave(x, y) {
+  let r = 0;
+  for (let b = 0; b < 16; b++) r += (((x >> b) & 1) << (2 * b)) + (((y >> b) & 1) << (2 * b + 1));
+  return r >>> 0;
+}
+
+const pixDeg = (order) => Math.sqrt(4 * Math.PI / (12 * 4 ** order)) / D2R;
+
+function tanToSky(ra0, dec0, xi, eta) {
+  const x = xi * D2R, y = eta * D2R, d0 = dec0 * D2R, rho = Math.hypot(x, y);
+  if (rho === 0) return [ra0, dec0];
+  const c = Math.atan(rho), sc = Math.sin(c), cc = Math.cos(c);
+  const dec = Math.asin(cc * Math.sin(d0) + y * sc * Math.cos(d0) / rho);
+  const ra = ra0 + Math.atan2(x * sc, rho * Math.cos(d0) * cc - y * Math.sin(d0) * sc) / D2R;
+  return [((ra % 360) + 360) % 360, dec / D2R];
+}
+
+function skyToTan(ra0, dec0, ra, dec) {
+  const a = (ra - ra0) * D2R, d = dec * D2R, d0 = dec0 * D2R;
+  const cosc = Math.sin(d0) * Math.sin(d) + Math.cos(d0) * Math.cos(d) * Math.cos(a);
+  return [Math.cos(d) * Math.sin(a) / cosc / D2R, (Math.cos(d0) * Math.sin(d) - Math.sin(d0) * Math.cos(d) * Math.cos(a)) / cosc / D2R];
+}
+
+function parseFits(buf) {
+  if (buf.byteLength < 2880 || String.fromCharCode(...new Uint8Array(buf, 0, 6)) !== "SIMPLE") return null;
+  const dv = new DataView(buf), hdr = {};
+  let off = 0, done = false;
+  while (!done && off + 2880 <= buf.byteLength) {
+    for (let i = 0; i < 36; i++) {
+      const card = String.fromCharCode(...new Uint8Array(buf, off + i * 80, 80));
+      const key = card.slice(0, 8).trim();
+      if (key === "END") { done = true; break; }
+      if (card[8] === "=") hdr[key] = card.slice(10).split("/")[0].replace(/'/g, "").trim();
+    }
+    off += 2880;
+  }
+  const bitpix = +hdr.BITPIX, w = +hdr.NAXIS1, h = +hdr.NAXIS2, bs = +(hdr.BSCALE || 1), bz = +(hdr.BZERO || 0);
+  const blank = hdr.BLANK !== undefined ? +hdr.BLANK : null, nb = Math.abs(bitpix) / 8, out = new Float32Array(w * h);
+  if (!done || !(w > 0) || off + w * h * nb > buf.byteLength) return null;
+  const get = {"-32": (p) => dv.getFloat32(p), "-64": (p) => dv.getFloat64(p), "16": (p) => dv.getInt16(p), "32": (p) => dv.getInt32(p), "8": (p) => dv.getUint8(p)}[bitpix];
+  for (let i = 0; i < w * h; i++) {
+    const v = get(off + i * nb);
+    out[i] = blank !== null && bitpix > 0 && v === blank ? NaN : bz + bs * v;
+  }
+  return {data: out, w};
+}
+
+async function hipsProps(sv) {
+  if (!propsCache[sv.id]) {
+    propsCache[sv.id] = (async () => {
+      for (const base of sv.bases) {
+        try {
+          const r = await fetchTimeout(base + "/properties", 10000);
+          if (!r.ok) continue;
+          const kv = {};
+          (await r.text()).split("\n").forEach((l) => { const m = l.match(/^\s*([\w.]+)\s*=\s*(.*)$/); if (m) kv[m[1]] = m[2].trim(); });
+          return {base, order: +kv.hips_order, width: +(kv.hips_tile_width || 512)};
+        } catch (e) { /* next mirror */ }
+      }
+      throw new Error("HiPS unreachable: " + cutLabel(sv));
+    })();
+    propsCache[sv.id].catch(() => delete propsCache[sv.id]);
+  }
+  return propsCache[sv.id];
+}
+
+async function fetchTile(url, fmt) {
+  const r = await fetchTimeout(url, 30000);
+  if (r.status === 404) return null;
+  if (!r.ok) throw new Error("HTTP " + r.status);
+  if (fmt === "fits") {
+    let buf = await r.arrayBuffer();
+    const magic = new Uint8Array(buf, 0, Math.min(2, buf.byteLength));
+    // some servers (SkyView) send gzipped FITS without a Content-Encoding header
+    if (magic[0] === 0x1f && magic[1] === 0x8b && typeof DecompressionStream !== "undefined") {
+      buf = await new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream("gzip"))).arrayBuffer();
+    }
+    const f = parseFits(buf);
+    return f && Object.assign(f, {fits: true});
+  }
+  const bmp = await createImageBitmap(await r.blob());
+  const cv = document.createElement("canvas");
+  cv.width = bmp.width; cv.height = bmp.height;
+  const ctx = cv.getContext("2d");
+  ctx.drawImage(bmp, 0, 0);
+  const px = ctx.getImageData(0, 0, cv.width, cv.height).data, out = new Float32Array(cv.width * cv.height);
+  for (let i = 0; i < out.length; i++) out[i] = px[4 * i + 3] === 0 ? NaN : 0.299 * px[4 * i] + 0.587 * px[4 * i + 1] + 0.114 * px[4 * i + 2];
+  return {data: out, w: cv.width, fits: false};
+}
+
+function loadTile(url, fmt) {
+  if (!tileCache.has(url)) {
+    const p = fetchTile(url, fmt);
+    p.catch(() => tileCache.delete(url));
+    tileCache.set(url, p);
+    if (tileCache.size > 200) tileCache.delete(tileCache.keys().next().value);
+  }
+  return tileCache.get(url);
+}
+
+// Resample a HiPS survey onto an n×n gnomonic grid centred on (ra0, dec0); pixel (i, j): i=0 east, j=0 south.
+async function hipsCutout(sv, ra0, dec0, fovDeg, n) {
+  const P = await hipsProps(sv);
+  const W = P.width, lw = Math.round(Math.log2(W)), scale = fovDeg / n, c = (n - 1) / 2;
+  let K = 3 + lw;
+  while (K < P.order + lw && pixDeg(K) > scale) K++;
+  const k = K - lw, need = new Map(), out = new Float32Array(n * n).fill(NaN);
+  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+    const [ra, dec] = tanToSky(ra0, dec0, -(i - c) * scale, (j - c) * scale);
+    const [face, ix, iy] = ang2xyf(K, ra, dec);
+    const N = face * 4 ** k + interleave(Math.floor(ix / W), Math.floor(iy / W));
+    let list = need.get(N);
+    if (!list) need.set(N, (list = []));
+    list.push(j * n + i, ix % W, iy % W);
+  }
+  // Pixel order inside a tile (validated against bright sources): FITS row = W-1-x, PNG/JPEG row = x; column = y.
+  await Promise.all([...need].map(async ([N, list]) => {
+    const tile = await loadTile(`${P.base}/Norder${k}/Dir${Math.floor(N / 10000) * 10000}/Npix${N}.${sv.fmt}`, sv.fmt);
+    if (!tile) return;
+    for (let q = 0; q < list.length; q += 3) {
+      const x = list[q + 1], y = list[q + 2];
+      out[list[q]] = tile.fits ? tile.data[(W - 1 - x) * W + y] : tile.data[x * W + y];
+    }
+  }));
+  return {data: out, n, scale, pixArcsec: pixDeg(K) * 3600, ra0, dec0, sv};
+}
+
+function gaussSmooth(data, n, sig) {
+  if (!(sig > 0.25)) return data;
+  const r = Math.ceil(3 * sig), ker = [];
+  for (let k = -r; k <= r; k++) ker.push(Math.exp(-0.5 * (k / sig) ** 2));
+  const pass = (val, wt, horiz) => {
+    const v2 = new Float32Array(n * n), w2 = new Float32Array(n * n);
+    for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+      let sv = 0, sw = 0;
+      for (let k = -r; k <= r; k++) {
+        const ii = horiz ? i + k : i, jj = horiz ? j : j + k;
+        if (ii < 0 || jj < 0 || ii >= n || jj >= n) continue;
+        const q = jj * n + ii;
+        sv += ker[k + r] * val[q]; sw += ker[k + r] * wt[q];
+      }
+      v2[j * n + i] = sv; w2[j * n + i] = sw;
+    }
+    return [v2, w2];
+  };
+  const val = new Float32Array(n * n), wt = new Float32Array(n * n);
+  for (let q = 0; q < n * n; q++) if (Number.isFinite(data[q])) { val[q] = data[q]; wt[q] = 1; }
+  const [v1, w1] = pass(val, wt, true), [v3, w3] = pass(v1, w1, false);
+  const out = new Float32Array(n * n);
+  for (let q = 0; q < n * n; q++) out[q] = w3[q] > 0.05 && Number.isFinite(data[q]) ? v3[q] / w3[q] : NaN;
+  return out;
+}
+
+function robustRms(data) {
+  const v = Array.from(data).filter(Number.isFinite).sort((a, b) => a - b);
+  if (v.length < 20) return NaN;
+  const med = v[v.length >> 1], dev = v.map((x) => Math.abs(x - med)).sort((a, b) => a - b);
+  return 1.4826 * dev[dev.length >> 1];
+}
+
+function toRows(arr, n, f) {
+  const rows = [];
+  for (let j = 0; j < n; j++) { const row = new Array(n); for (let i = 0; i < n; i++) row[i] = f(arr[j * n + i]); rows.push(row); }
+  return rows;
+}
+
+function stretchFn(kind, lo, hi) {
+  const span = hi - lo || 1;
+  return {
+    linear: (v) => v - lo,
+    sqrt: (v) => Math.sqrt(Math.max(v - lo, 0)),
+    log: (v) => Math.log10(Math.max(v - lo, 0) + span * 1e-3),
+    asinh: (v) => Math.asinh((v - lo) / (0.02 * span)),
+  }[kind];
+}
+
+function fillCutSelects() {
+  const dec = state ? state.src.dec : 0;
+  const opts = (list) => list.map((s) => `<option value="${s.id}"${s.dec && !inDec(s.dec, dec) ? " disabled" : ""}>${esc(cutLabel(s))}</option>`).join("");
+  const x = $("xrX").value, r = $("xrR").value;
+  $("xrX").innerHTML = opts(CUT.x);
+  $("xrR").innerHTML = opts(CUT.radio) + `<option value="">${esc(t("none"))}</option>`;
+  if (x) $("xrX").value = x;
+  if (r !== undefined) $("xrR").value = r;
+}
+
+function xrayCandidates() {
+  const res = state.results, l = state.src.l;
+  const has = (k) => res[k] && res[k].n_done > 0;
+  const c = [];
+  if (has("chandra")) c.push("chandra");
+  if (has("xmm")) c.push("xmm");
+  if (has("swift")) c.push("swift");
+  if (l > 179.9442 && l < 359.9442) c.push("erosita");
+  c.push("swift");
+  return [...new Set(c)];
+}
+
+const hasData = (cut) => cut && !cut.error && Array.from(cut.data).some((v) => Number.isFinite(v) && v > 0);
+
+async function runXr(sid) {
+  $("xr").classList.remove("hidden");
+  fillCutSelects();
+  const r = (CUT.radio.find((s) => inDec(s.dec, state.src.dec)) || {id: ""}).id;
+  $("xrR").value = r;
+  state.xr = {};
+  // try the X-ray surveys in order of preference and keep the first one that has pixels here
+  const cands = xrayCandidates();
+  for (let i = 0; i < cands.length; i++) {
+    $("xrX").value = cands[i];
+    $("xrFov").value = String(CUT_BY_ID[cands[i]].fov);
+    $("xrSig").value = CUT_BY_ID[cands[i]].sig;
+    await computeXr(sid, i < cands.length - 1);
+    if (sid !== searchSeq || hasData(state.xr.xc)) break;
+  }
+  if (sid === searchSeq && state.xr.xc && !state.xr.drawn) drawXr();
+}
+
+async function computeXr(sid, probing) {
+  if (!state || sid !== searchSeq) return;
+  const xs = CUT_BY_ID[$("xrX").value], rs = CUT_BY_ID[$("xrR").value], fov = (+$("xrFov").value) / 60;
+  const {ra, dec} = state.src, token = {};
+  state.xrToken = token;
+  $("xrStatus").innerHTML = `<span class="spin"></span> ${esc(t("xrLoading"))}`;
+  const [xc, rc] = await Promise.all([
+    hipsCutout(xs, ra, dec, fov, CUT_N).catch((e) => ({error: e.message})),
+    rs ? hipsCutout(rs, ra, dec, fov, CUT_N).catch((e) => ({error: e.message})) : Promise.resolve(null)]);
+  if (sid !== searchSeq || state.xrToken !== token) return;
+  state.xr = {xc, rc, drawn: false};
+  $("xrStatus").textContent = "";
+  if (probing && !hasData(xc)) return;
+  state.xr.drawn = true;
+  drawXr();
+}
+
+async function drawXr() {
+  if (!state || !state.xr || !state.xr.xc) return;
+  const {xc, rc} = state.xr;
+  let P;
+  try { P = await loadPlotly(); } catch (e) { $("xrStatus").textContent = e.message; return; }
+  const n = CUT_N, traces = [];
+  const scale = xc.scale || (rc && rc.scale);
+  $("xrSigV").textContent = $("xrSig").value;
+  if (!scale) {
+    P.purge("xrPlot");
+    $("xrInfo").textContent = [xc.error, rc && rc.error].filter(Boolean).join(" · ");
+    return;
+  }
+  const ax = Array.from({length: n}, (_, i) => -(i - (n - 1) / 2) * scale * 60);
+  const ay = Array.from({length: n}, (_, j) => (j - (n - 1) / 2) * scale * 60);
+  const info = {x: cutLabel(CUT_BY_ID[$("xrX").value]), xp: "—", r: rc && rc.sv ? cutLabel(rc.sv) : (rc && rc.error) || t("none")};
+  let note = "";
+  if (xc.error) note = xc.error;
+  else {
+    const sm = gaussSmooth(xc.data, n, (+$("xrSig").value) / 3600 / xc.scale);
+    const lo = quantile(Array.from(sm), 0.01), hi = quantile(Array.from(sm), 0.997);
+    info.xp = xc.pixArcsec.toFixed(1);
+    if (!Number.isFinite(lo)) note = t("xrNoData");
+    else {
+      const f = stretchFn($("xrStr").value, lo, hi);
+      traces.push({type: "heatmap", x: ax, y: ay, z: toRows(sm, n, (v) => (Number.isFinite(v) ? f(v) : null)),
+        customdata: toRows(sm, n, (v) => (Number.isFinite(v) ? v : null)), colorscale: INFERNO, zmin: f(lo), zmax: f(hi),
+        showscale: false, hovertemplate: `Δα %{x:.2f}′ · Δδ %{y:.2f}′<br>X-ray %{customdata:.3g} ${esc(xc.sv.unit)}<extra></extra>`});
+    }
+  }
+  if (rc && !rc.error) {
+    const rms = robustRms(rc.data), lev = +$("xrLev").value;
+    const rsm = gaussSmooth(rc.data, n, 0.6 * rc.pixArcsec / 3600 / rc.scale);
+    const peak = Math.max(...Array.from(rsm).filter(Number.isFinite));
+    info.rp = rc.pixArcsec.toFixed(1);
+    info.rms = Number.isFinite(rms) ? (rms * 1000).toPrecision(2) : "?";
+    if (lev > 0 && Number.isFinite(rms) && rms > 0) {
+      const l0 = lev * rms;
+      info.l0 = (l0 * 1000).toPrecision(2);
+      if (peak > l0) {
+        traces.push({type: "contour", x: ax, y: ay, z: toRows(rsm, n, (v) => (Number.isFinite(v) ? Math.log10(Math.max(v, l0 * 0.5)) : null)),
+          showscale: false, hoverinfo: "skip", name: cutLabel(rc.sv), showlegend: true, line: {width: 1.3},
+          colorscale: [[0, "#3fd0ff"], [1, "#3fd0ff"]],
+          contours: {coloring: "lines", start: Math.log10(l0), end: Math.log10(peak), size: Math.log10(2)}});
+      } else note = (note ? note + " · " : "") + t("xrNoContours");
+    } else info.l0 = "—";
+  } else if (rc && rc.error) info.r = rc.error;
+  // source position and the nearest catalogue matches
+  const marks = [{name: t("xrSrc"), xi: 0, eta: 0, sym: "cross-thin-open", col: "#ffffff", size: 16}];
+  const half = scale * n / 2;
+  for (const [key, res] of Object.entries(state.cats || {})) {
+    if (!res || !res.hits || !res.hits.length) continue;
+    const h = res.hits[0];
+    if (!Number.isFinite(h.ra)) continue;
+    const [xi, eta] = skyToTan(state.src.ra, state.src.dec, h.ra, h.dec);
+    if (Math.abs(xi) > half || Math.abs(eta) > half) continue;
+    const isX = res.cat.kind === "x";
+    marks.push({name: `${res.cat.label}${h.name ? ": " + h.name : ""}`, xi, eta, sym: isX ? "circle-open" : "diamond-open", col: isX ? "#7CFC00" : "#3fd0ff", size: 11});
+  }
+  marks.forEach((m) => traces.push({type: "scatter", mode: "markers", x: [m.xi * 60], y: [m.eta * 60], name: m.name,
+    marker: {symbol: m.sym, color: m.col, size: m.size, line: {width: 2, color: m.col}}, hovertemplate: `${esc(m.name)}<extra></extra>`, showlegend: false}));
+  const layout = plotTheme({margin: {l: 56, r: 10, t: 10, b: 50}, showlegend: false, plot_bgcolor: "#000"});
+  layout.xaxis = Object.assign(layout.xaxis, {title: {text: "Δα cos δ (′)"}, autorange: "reversed", constrain: "domain"});
+  layout.yaxis = Object.assign(layout.yaxis, {title: {text: "Δδ (′)"}, scaleanchor: "x", scaleratio: 1, constrain: "domain"});
+  await P.react("xrPlot", traces, layout, PLOT_CONFIG);
+  $("xrInfo").textContent = t("xrInfo")(info) + (note ? " " + note : "");
+}
+
+function fitsCard(key, value) {
+  let v;
+  if (typeof value === "boolean") v = (value ? "T" : "F").padStart(20);
+  else if (typeof value === "string") v = `'${value.replace(/[^\x20-\x7e]/g, "-").replace(/'/g, "''").slice(0, 66)}'`.padEnd(20);
+  else v = (Number.isInteger(value) ? String(value) : value.toPrecision(12).toUpperCase()).padStart(20);
+  return (key.padEnd(8) + "= " + v).padEnd(80).slice(0, 80);
+}
+
+function cutoutFits(cut, extra) {
+  const n = cut.n, cards = [fitsCard("SIMPLE", true), fitsCard("BITPIX", -32), fitsCard("NAXIS", 2), fitsCard("NAXIS1", n), fitsCard("NAXIS2", n),
+    fitsCard("CTYPE1", "RA---TAN"), fitsCard("CTYPE2", "DEC--TAN"), fitsCard("CRPIX1", (n + 1) / 2), fitsCard("CRPIX2", (n + 1) / 2),
+    fitsCard("CRVAL1", +cut.ra0.toFixed(8)), fitsCard("CRVAL2", +cut.dec0.toFixed(8)), fitsCard("CDELT1", -cut.scale), fitsCard("CDELT2", cut.scale),
+    fitsCard("CUNIT1", "deg"), fitsCard("CUNIT2", "deg"), fitsCard("RADESYS", "ICRS"), fitsCard("BUNIT", cut.sv.unit),
+    fitsCard("ORIGIN", "X-ray Archive Finder"), ...extra.map(([k, v]) => fitsCard(k, v))];
+  cards.push("END".padEnd(80));
+  let head = cards.join("");
+  head = head.padEnd(Math.ceil(head.length / 2880) * 2880);
+  const dataBytes = Math.ceil(n * n * 4 / 2880) * 2880, buf = new ArrayBuffer(head.length + dataBytes), dv = new DataView(buf);
+  for (let i = 0; i < head.length; i++) dv.setUint8(i, head.charCodeAt(i) & 0x7f);
+  for (let q = 0; q < n * n; q++) dv.setFloat32(head.length + q * 4, cut.data[q]);
+  return new Blob([buf], {type: "application/fits"});
+}
+
+function downloadCutout(which) {
+  const cut = state && state.xr && state.xr[which];
+  if (!cut || cut.error) return;
+  const name = (state.src.main_id || state.src.query).replace(/[^\w.+-]+/g, "_");
+  const blob = cutoutFits(cut, [["SURVEY", cutLabel(cut.sv, "en").slice(0, 60)], ["HIPSURL", ""], ["PIXSCALE", +cut.pixArcsec.toFixed(3)]].filter(([, v]) => v !== ""));
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `${name}_${cut.sv.id}_${(+$("xrFov").value)}arcmin.fits`;
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+
+function initXrControls() {
+  const recompute = () => state && computeXr(state.id);
+  $("xrX").addEventListener("change", () => {
+    const s = CUT_BY_ID[$("xrX").value];
+    $("xrFov").value = String(s.fov); $("xrSig").value = s.sig;
+    recompute();
+  });
+  $("xrR").addEventListener("change", recompute);
+  $("xrFov").addEventListener("change", recompute);
+  ["xrSig", "xrStr", "xrLev"].forEach((id) => $(id).addEventListener(id === "xrSig" ? "input" : "change", () => drawXr()));
+  $("xrPng").addEventListener("click", () => loadPlotly().then((P) => P.downloadImage("xrPlot", {format: "png", width: 900, height: 900,
+    filename: `${(state.src.main_id || state.src.query).replace(/[^\w.+-]+/g, "_")}_xray_radio`})));
+  $("xrFitsX").addEventListener("click", () => downloadCutout("xc"));
+  $("xrFitsR").addEventListener("click", () => downloadCutout("rc"));
+}
+
+// ---------------------------------------------------------------- catalogue flux plots
+const MCRAB = {"20–40 keV": 7.57e-12, "40–100 keV": 9.42e-12};
+const PLOT_COLORS = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b", "#e377c2", "#17becf", "#bcbd22", "#7f7f7f"];
+let fluxTimer = null;
+
+function scheduleFluxPlots() {
+  clearTimeout(fluxTimer);
+  fluxTimer = setTimeout(drawFluxPlots, 250);
+}
+
+function bandRange(band) {
+  const m = band.match(/([\d.]+)–([\d.]+)\s*keV/);
+  return m ? [+m[1], +m[2]] : null;
+}
+
+function bandFreq(band) {
+  const m = band.match(/([\d.]+)\s*(GHz|MHz)/);
+  return m ? +m[1] * (m[2] === "GHz" ? 1 : 1e-3) : null;
+}
+
+async function drawFluxPlots() {
+  if (!state || !CATMAN) return;
+  const cats = state.cats || {};
+  const xs = [], rs = [];
+  for (const res of Object.values(cats)) {
+    if (!res || !res.hits || !res.hits.length || res.hits[0].flux == null) continue;
+    const c = res.cat, h = res.hits[0];
+    if (c.kind === "x") {
+      const br = bandRange(c.band);
+      if (!br) continue;
+      const k = c.unit === "mCrab" ? MCRAB[c.band] || 7.57e-12 : 1;
+      xs.push({c, h, lo: br[0], hi: br[1], f: h.flux * k, en: (h.eneg || 0) * k, ep: (h.epos || 0) * k});
+    } else {
+      const nu = bandFreq(c.band);
+      if (nu) rs.push({c, h, nu, f: h.flux, e: h.epos || h.eneg || 0});
+    }
+  }
+  if (!xs.length && !rs.length) {
+    $("fxPlot").innerHTML = `<p class="muted">${esc(t("noFluxes"))}</p>`; $("frPlot").innerHTML = "";
+    return;
+  }
+  let P;
+  try { P = await loadPlotly(); } catch (e) { return; }
+  // X-ray: band-integrated fluxes drawn across each band
+  const xTraces = xs.map((p, i) => {
+    const x = Math.sqrt(p.lo * p.hi);
+    return {type: "scatter", mode: "markers", name: p.c.label, x: [x], y: [p.f],
+      error_x: {type: "data", symmetric: false, array: [p.hi - x], arrayminus: [x - p.lo], thickness: 1.4, width: 0},
+      error_y: {type: "data", symmetric: false, array: [p.ep], arrayminus: [Math.min(p.en, p.f * 0.999)], thickness: 1.2, width: 4},
+      marker: {size: 9, color: PLOT_COLORS[i % PLOT_COLORS.length]},
+      hovertemplate: `<b>${esc(p.c.label)}</b><br>${esc(p.h.name || "")}<br>${esc(p.c.band)}: %{y:.3g} erg/s/cm²<br>${fmt(p.h.sep, 1)}″<extra></extra>`};
+  });
+  const lx = plotTheme({showlegend: true, legend: {orientation: "h", y: -0.32, font: {size: 10}}, margin: {l: 64, r: 10, t: 10, b: 110}});
+  lx.xaxis = Object.assign(lx.xaxis, {type: "log", title: {text: "E (keV)"}});
+  lx.yaxis = Object.assign(lx.yaxis, {type: "log", title: {text: "F (erg/s/cm²)"}, exponentformat: "power"});
+  if (xs.length) await P.react("fxPlot", xTraces, lx, PLOT_CONFIG);
+  else $("fxPlot").innerHTML = `<p class="muted">${esc(t("noFluxes"))}</p>`;
+  // Radio: S(ν) with a weighted power-law fit in log space
+  const rTraces = rs.map((p, i) => ({type: "scatter", mode: "markers", name: `${p.c.label} (${p.c.band})`, x: [p.nu * 1000], y: [p.f],
+    error_y: {type: "data", array: [p.e], thickness: 1.2, width: 4}, marker: {size: 9, color: PLOT_COLORS[(i + 3) % PLOT_COLORS.length]},
+    hovertemplate: `<b>${esc(p.c.label)}</b><br>${esc(p.h.name || "")}<br>${esc(p.c.band)}: %{y:.4g} mJy<br>${fmt(p.h.sep, 1)}″<extra></extra>`}));
+  const lr = plotTheme({showlegend: true, legend: {orientation: "h", y: -0.32, font: {size: 10}}, margin: {l: 64, r: 10, t: 10, b: 110}});
+  lr.xaxis = Object.assign(lr.xaxis, {type: "log", title: {text: "ν (MHz)"}});
+  lr.yaxis = Object.assign(lr.yaxis, {type: "log", title: {text: "S (mJy)"}});
+  const nus = [...new Set(rs.map((p) => p.nu))];
+  if (nus.length >= 2) {
+    let sw = 0, sx = 0, sy = 0, sxx = 0, sxy = 0;
+    rs.forEach((p) => {
+      const x = Math.log10(p.nu), y = Math.log10(p.f), s = Math.max(p.e / p.f || 0, 0.05) / Math.LN10, w = 1 / (s * s);
+      sw += w; sx += w * x; sy += w * y; sxx += w * x * x; sxy += w * x * y;
+    });
+    const det = sw * sxx - sx * sx;
+    if (det > 0) {
+      const a = (sw * sxy - sx * sy) / det, b = (sy - a * sx) / sw, ea = Math.sqrt(sw / det);
+      const lo = Math.min(...nus) * 0.8, hi = Math.max(...nus) * 1.25;
+      rTraces.push({type: "scatter", mode: "lines", name: t("alphaFit")(a.toFixed(2), ea.toFixed(2)), x: [lo * 1000, hi * 1000],
+        y: [10 ** (b + a * Math.log10(lo)), 10 ** (b + a * Math.log10(hi))], line: {color: "#888", dash: "dash", width: 1.4}, hoverinfo: "skip"});
+    }
+  }
+  if (rs.length) await P.react("frPlot", rTraces, lr, PLOT_CONFIG);
+  else $("frPlot").innerHTML = `<p class="muted">${esc(t("noFluxes"))}</p>`;
 }
 
 // ---------------------------------------------------------------- CSV
@@ -1478,7 +2182,7 @@ async function search(q) {
   if (fixed && !(radius > 0 && radius <= MAX_RADIUS)) { showStatus(t("radiusErr"), true); return; }
   syncUrl(q, radius);
   $("go").disabled = true;
-  ["source", "results", "images", "catalogs"].forEach((id) => $(id).classList.add("hidden"));
+  ["source", "results", "images", "catalogs", "xr", "spec"].forEach((id) => $(id).classList.add("hidden"));
   $("legend").innerHTML = "";
   showStatus(`<span class="spin"></span> ${esc(t("resolving")(q))}`);
   let src;
@@ -1498,9 +2202,9 @@ async function search(q) {
   runCatalogs(sid);
   showMap(src);
   runSurveys(sid);
-  runSdss(sid);
+  runSpectra(sid);
   await pool(MISSIONS.map((m) => m.key), 6, (k) => runMission(k, sid));
-  if (sid === searchSeq) $("go").disabled = false;
+  if (sid === searchSeq) { $("go").disabled = false; runXr(sid); }
 }
 
 async function loadManifest() {
@@ -1525,7 +2229,11 @@ async function loadManifest() {
   const p = new URLSearchParams(location.search);
   if (p.get("r")) { document.querySelector("input[value=fixed]").checked = true; $("radius").value = p.get("r"); }
   if (p.get("q")) $("q").value = p.get("q");
+  loadPlotly().catch(() => {});
   initBatch();
+  initXrControls();
+  ["spSel", "spBox", "spRest", "spLines", "spModel"].forEach((id) => $(id).addEventListener("change", drawSpectrum));
+  $("spCsv").addEventListener("click", spectrumCsv);
   try {
     const [m] = await Promise.all([loadManifest(), loadCatManifest()]);
     MISSIONS = m.missions; SURVEYS = m.surveys;
