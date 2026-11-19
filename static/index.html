@@ -337,7 +337,7 @@ const I18N = {
     xrTitle: "X-ray image with radio contours", xrImage: "X-ray image", xrContours: "Radio contours", xrFov: "Field",
     xrSmooth: "Smoothing σ", xrStretch: "Stretch", xrLevels: "Lowest contour",
     xrNote: "The X-ray image and the radio map are read pixel by pixel from the survey HiPS tiles and resampled onto the same tangent-plane grid centred on the source (east left, north up). Contours start at the chosen multiple of the radio map's robust rms and double at each level. Chandra and XMM-Newton images are colour composites converted to relative intensity, so they show morphology but not calibrated counts; Swift-XRT and eROSITA are counts maps. FITS downloads are the unsmoothed cutouts with a TAN WCS header.",
-    xrLoading: "Reading survey tiles…", xrNoData: "No data from this survey at this position.", xrNoContours: "no radio emission above the lowest contour",
+    xrLoading: "Reading survey tiles…", xrNoData: "No data from this survey at this position (or the survey server is unreachable).", xrNoContours: "no radio emission above the lowest contour",
     xrInfo: (a) => `X-ray: ${a.x} (pixel ${a.xp}″). Radio: ${a.r}${a.rp ? ` (pixel ${a.rp}″, rms ${a.rms} mJy/beam, contours from ${a.l0} mJy/beam ×2ⁿ)` : ""}.`,
     xrSrc: "source position", dlPng: "Download PNG", dlFitsX: "X-ray FITS", dlFitsR: "Radio FITS", dlCsv: "Download CSV",
     fxTitle: "X-ray catalogue fluxes", frTitle: "Radio spectrum",
@@ -402,7 +402,7 @@ const I18N = {
     xrTitle: "Radyo konturlu X-ray görüntüsü", xrImage: "X-ray görüntüsü", xrContours: "Radyo konturları", xrFov: "Alan",
     xrSmooth: "Yumuşatma σ", xrStretch: "Ölçek", xrLevels: "En düşük kontur",
     xrNote: "X-ray görüntüsü ve radyo haritası, taramaların HiPS karolarından piksel piksel okunup kaynağa ortalanmış aynı teğet düzlem ızgarasına yeniden örneklenir (doğu solda, kuzey yukarıda). Konturlar radyo haritasının gürbüz rms değerinin seçilen katından başlar ve her seviyede ikiye katlanır. Chandra ve XMM-Newton görüntüleri renkli kompozitlerden göreli parlaklığa çevrilir; morfolojiyi gösterir ama kalibre sayım değildir. Swift-XRT ve eROSITA sayım haritalarıdır. FITS indirmeleri, TAN WCS başlıklı yumuşatılmamış kesitlerdir.",
-    xrLoading: "Tarama karoları okunuyor…", xrNoData: "Bu taramanın bu konumda verisi yok.", xrNoContours: "en düşük konturun üzerinde radyo salınımı yok",
+    xrLoading: "Tarama karoları okunuyor…", xrNoData: "Bu taramanın bu konumda verisi yok (ya da tarama sunucusuna ulaşılamıyor).", xrNoContours: "en düşük konturun üzerinde radyo salınımı yok",
     xrInfo: (a) => `X-ray: ${a.x} (piksel ${a.xp}″). Radyo: ${a.r}${a.rp ? ` (piksel ${a.rp}″, rms ${a.rms} mJy/beam, konturlar ${a.l0} mJy/beam ×2ⁿ)` : ""}.`,
     xrSrc: "kaynak konumu", dlPng: "PNG indir", dlFitsX: "X-ray FITS", dlFitsR: "Radyo FITS", dlCsv: "CSV indir",
     fxTitle: "X-ray katalog akıları", frTitle: "Radyo spektrumu",
@@ -1594,7 +1594,9 @@ async function hipsProps(sv) {
 }
 
 async function fetchTile(url, fmt) {
-  const r = await fetchTimeout(url, 30000);
+  let r;
+  // Several HiPS servers send their 404s without CORS headers, so a missing tile surfaces as a network error.
+  try { r = await fetchTimeout(url, 30000); } catch (e) { return null; }
   if (r.status === 404) return null;
   if (!r.ok) throw new Error("HTTP " + r.status);
   if (fmt === "fits") {
