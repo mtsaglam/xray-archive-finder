@@ -2276,7 +2276,8 @@ async function drawLightcurve() {
     const lo = Math.min(...pts.map((p) => p.flux - Math.min(p.eneg || 0, p.flux * 0.999)));
     const hi = Math.max(...pts.map((p) => p.flux + (p.epos || 0)));
     const a = Math.log10(lo), b = Math.log10(hi);
-    if (isFinite(a) && isFinite(b) && b - a < 1) Object.assign(layout.yaxis, {range: [Math.floor((a + b) / 2 - 0.5), Math.ceil((a + b) / 2 + 0.5)], dtick: "D2"});
+    if (isFinite(a) && isFinite(b) && b - a < 1) layout.yaxis.range = [Math.floor((a + b) / 2 - 0.5), Math.ceil((a + b) / 2 + 0.5)];
+    if (isFinite(a) && isFinite(b) && b - a <= 4) layout.yaxis.dtick = "D2"; // label only 2 and 5 between decades
   }
   await plotDraw(P, "lcPlot", traces, layout);
   const parts = keys.map((k) => {
