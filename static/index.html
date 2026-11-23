@@ -187,7 +187,7 @@ tr.detail .mscript { margin: 8px 0 6px; font-size: 13px; padding: 5px 10px; }
     <div class="toolbar">
       <h2 style="margin:0" data-i18n="obsTitle"></h2>
       <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
-        <label class="muted" style="font-size:14px"><input type="checkbox" id="hideZero"> <span data-i18n="hideZero"></span></label>
+        <label class="muted" style="font-size:14px"><input type="checkbox" id="hideZero" checked autocomplete="off"> <span data-i18n="hideZero"></span></label>
         <button id="csv" disabled data-i18n="csv"></button>
         <button id="dlScript" disabled data-i18n="dlScript"></button>
       </div>
@@ -1108,13 +1108,24 @@ function loadPlotly() {
 function plotTheme(extra) {
   const css = getComputedStyle(document.documentElement);
   const v = (n) => css.getPropertyValue(n).trim();
-  const axis = {gridcolor: v("--line"), zerolinecolor: v("--line"), linecolor: v("--line"), color: v("--muted")};
+  const axis = {gridcolor: v("--line"), zerolinecolor: v("--line"), linecolor: v("--line"), color: v("--muted"), automargin: true};
   return Object.assign({paper_bgcolor: "rgba(0,0,0,0)", plot_bgcolor: "rgba(0,0,0,0)", font: {color: v("--ink"), size: 12},
     margin: {l: 64, r: 16, t: 16, b: 52}, xaxis: Object.assign({}, axis), yaxis: Object.assign({}, axis),
     legend: {font: {size: 11}}, hoverlabel: {font: {size: 12}}}, extra || {});
 }
 
 const PLOT_CONFIG = {responsive: true, displaylogo: false, modeBarButtonsToRemove: ["lasso2d", "select2d"]};
+
+// A plot div holds either a Plotly figure or a short note, never both: a note left inside would sit on top of
+// the next figure, and a figure wiped with innerHTML would confuse the next Plotly.react.
+function plotNote(id, text) {
+  if (window.Plotly) try { window.Plotly.purge(id); } catch (e) { /* not a plot */ }
+  $(id).innerHTML = text ? `<p class="muted">${esc(text)}</p>` : "";
+}
+function plotDraw(P, id, traces, layout) {
+  $(id).querySelectorAll(":scope > p").forEach((e) => e.remove());
+  return P.react(id, traces, layout, PLOT_CONFIG);
+}
 
 // ---------------------------------------------------------------- optical spectrum (SPARCL: SDSS / BOSS / DESI)
 const SPARCL = "https://astrosparcl.datalab.noirlab.edu/api";
@@ -1980,7 +1991,7 @@ async function drawFluxPlots() {
     }
   }
   if (!xs.length && !rs.length) {
-    $("fxPlot").innerHTML = `<p class="muted">${esc(t("noFluxes"))}</p>`; $("frPlot").innerHTML = "";
+    plotNote("fxPlot", t("noFluxes")); plotNote("frPlot", "");
     return;
   }
   let P;
@@ -1997,8 +2008,8 @@ async function drawFluxPlots() {
   const lx = plotTheme({showlegend: true, legend: {orientation: "h", y: -0.32, font: {size: 10}}, margin: {l: 64, r: 10, t: 10, b: 110}});
   lx.xaxis = Object.assign(lx.xaxis, {type: "log", title: {text: "E (keV)"}});
   lx.yaxis = Object.assign(lx.yaxis, {type: "log", title: {text: "F (erg/s/cm²)"}, exponentformat: "power"});
-  if (xs.length) await P.react("fxPlot", xTraces, lx, PLOT_CONFIG);
-  else $("fxPlot").innerHTML = `<p class="muted">${esc(t("noFluxes"))}</p>`;
+  if (xs.length) await plotDraw(P, "fxPlot", xTraces, lx);
+  else plotNote("fxPlot", t("noFluxes"));
   // Radio: S(ν) with a weighted power-law fit in log space
   const rTraces = rs.map((p, i) => ({type: "scatter", mode: "markers", name: `${p.c.label} (${p.c.band})`, x: [p.nu * 1000], y: [p.f],
     error_y: {type: "data", array: [p.e], thickness: 1.2, width: 4}, marker: {size: 9, color: PLOT_COLORS[(i + 3) % PLOT_COLORS.length]},
@@ -2021,8 +2032,8 @@ async function drawFluxPlots() {
         y: [10 ** (b + a * Math.log10(lo)), 10 ** (b + a * Math.log10(hi))], line: {color: "#888", dash: "dash", width: 1.4}, hoverinfo: "skip"});
     }
   }
-  if (rs.length) await P.react("frPlot", rTraces, lr, PLOT_CONFIG);
-  else $("frPlot").innerHTML = `<p class="muted">${esc(t("noFluxes"))}</p>`;
+  if (rs.length) await plotDraw(P, "frPlot", rTraces, lr);
+  else plotNote("frPlot", t("noFluxes"));
 }
 
 // ---------------------------------------------------------------- data download script (HEASARC FTP layout)
@@ -2110,12 +2121,14 @@ async function drawTimeline() {
     if (pub.length) traces.push(mk(pub, false));
     if (prop.length) traces.push(mk(prop, true));
   });
-  if (!traces.length) { P.purge("tlPlot"); $("tlPlot").innerHTML = ""; return; }
-  const layout = plotTheme({margin: {l: 120, r: 16, t: 10, b: 40}, hovermode: "closest"});
+  if (!traces.length) { plotNote("tlPlot", ""); Object.assign($("tlPlot").style, {height: "0", minHeight: "0"}); return; }
+  // the height follows the number of missions; give it to Plotly too, otherwise a later search keeps the old size and overflows
+  const h = Math.max(200, 70 + 34 * order.length);
+  const layout = plotTheme({height: h, margin: {l: 110, r: 16, t: 10, b: 40}, hovermode: "closest"});
   layout.xaxis = Object.assign(layout.xaxis, {type: "date"});
   layout.yaxis = Object.assign(layout.yaxis, {type: "category", categoryorder: "array", categoryarray: order.map((m) => m.label).reverse()});
-  $("tlPlot").style.height = Math.max(200, 60 + 34 * order.length) + "px";
-  await P.react("tlPlot", traces, layout, PLOT_CONFIG);
+  Object.assign($("tlPlot").style, {height: h + "px", minHeight: "0"});
+  await plotDraw(P, "tlPlot", traces, layout);
 }
 
 const mjdToIso = (m) => new Date((m - 40587) * 86400000).toISOString();
@@ -2233,8 +2246,7 @@ async function drawLightcurve() {
   const series = lcSeries();
   const keys = Object.keys(series).filter((k) => series[k].length);
   if (!keys.length) {
-    try { (await loadPlotly()).purge("lcPlot"); } catch (e) { /* none */ }
-    $("lcPlot").innerHTML = `<p class="muted">${esc(t("lcNone"))}</p>`;
+    plotNote("lcPlot", t("lcNone"));
     $("lcInfo").textContent = "";
     return;
   }
@@ -2257,8 +2269,16 @@ async function drawLightcurve() {
   const all = keys.flatMap((k) => series[k].flatMap((p) => (p.span ? p.span : [p.mjd])));
   const t0 = Math.min(...all), t1 = Math.max(...all), pad = Math.max(365, 0.05 * (t1 - t0));
   layout.xaxis = Object.assign(layout.xaxis, {type: "date", range: [mjdToIso(t0 - pad), mjdToIso(t1 + pad)]});
-  layout.yaxis = Object.assign(layout.yaxis, {type: logY ? "log" : "linear", title: {text: "F (erg/s/cm²)"}, exponentformat: "power"});
-  await P.react("lcPlot", traces, layout, PLOT_CONFIG);
+  layout.yaxis = Object.assign(layout.yaxis, {type: logY ? "log" : "linear", title: {text: "F (erg/s/cm²)", standoff: 8}, exponentformat: "power"});
+  if (logY) {
+    // span whole decades (at least one around the data), so one point or a quiet source does not fill the axis with crowded 4.35×10⁻¹¹-style ticks
+    const pts = keys.flatMap((k) => series[k]);
+    const lo = Math.min(...pts.map((p) => p.flux - Math.min(p.eneg || 0, p.flux * 0.999)));
+    const hi = Math.max(...pts.map((p) => p.flux + (p.epos || 0)));
+    const a = Math.log10(lo), b = Math.log10(hi);
+    if (isFinite(a) && isFinite(b) && b - a < 1) Object.assign(layout.yaxis, {range: [Math.floor((a + b) / 2 - 0.5), Math.ceil((a + b) / 2 + 0.5)], dtick: "D2"});
+  }
+  await plotDraw(P, "lcPlot", traces, layout);
   const parts = keys.map((k) => {
     const f = series[k].map((p) => p.flux), r = f.length > 1 ? Math.max(...f) / Math.min(...f) : null;
     return `${LC_STYLE[k][0]} ${f.length}${r ? " (" + t("lcRatio")(r.toFixed(1)) + ")" : ""}`;
