@@ -123,6 +123,8 @@ table.btab td.z { color: var(--zero); }
 .plot.wide { height: 440px; }
 .plots2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-bottom: 4px; }
 @media (max-width: 860px) { .plots2 { grid-template-columns: 1fr; } }
+tr.detail td.wrap { white-space: normal; min-width: 220px; max-width: 380px; }
+tr.detail .mscript { margin: 8px 0 6px; font-size: 13px; padding: 5px 10px; }
 .row.dl { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin-top: 10px; }
 .hidden { display: none !important; }
 </style>
@@ -187,6 +189,7 @@ table.btab td.z { color: var(--zero); }
       <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
         <label class="muted" style="font-size:14px"><input type="checkbox" id="hideZero"> <span data-i18n="hideZero"></span></label>
         <button id="csv" disabled data-i18n="csv"></button>
+        <button id="dlScript" disabled data-i18n="dlScript"></button>
       </div>
     </div>
     <div class="total" id="total"></div>
@@ -201,6 +204,9 @@ table.btab td.z { color: var(--zero); }
       </table>
     </div>
     <p class="muted note" data-i18n="tableNote"></p>
+    <div class="subhead" style="margin-top:16px" data-i18n="tlTitle"></div>
+    <div id="tlPlot" class="plot"></div>
+    <p class="muted note" data-i18n="tlNote"></p>
     <div class="surveys" id="surveys"></div>
   </section>
 
@@ -247,6 +253,19 @@ table.btab td.z { color: var(--zero); }
     <div class="subhead" data-i18n="catRadio"></div>
     <div class="tablewrap"><table class="cat" id="catr"></table></div>
     <p class="muted note" data-i18n="catNote"></p>
+  </section>
+
+  <section id="lc" class="card hidden">
+    <h2 data-i18n="lcTitle"></h2>
+    <div class="mapctl">
+      <label><input type="checkbox" id="lcCommon"> <span data-i18n="lcCommon"></span></label>
+      <label><input type="checkbox" id="lcLog" checked> <span data-i18n="lcLog"></span></label>
+      <button type="button" id="lcCsv" data-i18n="dlCsv"></button>
+      <span id="lcStatus" class="muted" style="font-size:13px"></span>
+    </div>
+    <div id="lcPlot" class="plot wide"></div>
+    <p class="muted note" id="lcInfo"></p>
+    <p class="muted note" data-i18n="lcNote"></p>
   </section>
 
   <section id="spec" class="card hidden">
@@ -343,6 +362,17 @@ const I18N = {
     fxTitle: "X-ray catalogue fluxes", frTitle: "Radio spectrum",
     fluxPlotNote: "X-ray points are band-integrated fluxes drawn across each catalogue's energy band (INTEGRAL converted with 1 mCrab = 7.57×10⁻¹² erg/s/cm² in 20–40 keV); bands differ, so values are not directly comparable. The radio fit is a weighted power law S ∝ ν^α over the plotted points; catalogues differ in resolution and epoch, so variable or extended sources can scatter.",
     noFluxes: "No catalogue fluxes to plot.", alphaFit: (a, e) => `α = ${a} ± ${e}`,
+    extraLabels: {pi: "PI", title: "Proposal title", detector: "Detector", grating: "Grating", instrument: "Instrument", type: "Type", ScW: "ScW"},
+    dlScript: "Data download script", dlMission: "Download script for this mission",
+    scriptHead: (s) => `HEASARC data download script for ${s}`,
+    scriptSkipped: "No download rule for these missions; use HEASARC Browse or the mission archive:",
+    scriptNone: "No public observations with a known archive layout.",
+    tlTitle: "Observation timeline",
+    tlNote: "Each marker is one observation (size ∝ √exposure); open markers are still proprietary. Hover for ObsID, exposure, PI and proposal title; drag to zoom.",
+    lcTitle: "X-ray light curve (catalogue fluxes per epoch)", lcCommon: "Convert to 0.5–10 keV (Γ = 2, no absorption)", lcLog: "Log flux",
+    lcLoading: "Collecting fluxes…", lcNone: "No multi-epoch X-ray catalogue fluxes at this position.",
+    lcInfo: (parts) => `Points per series: ${parts}.`, lcRatio: (r) => `max/min ${r}`, lcSat: "saturated or piled up",
+    lcNote: "Chandra points are per-observation fluxes from the Chandra Source Catalog 2.1 (queried live), XMM-Newton points come from the 5XMM-DR15 stacked catalogue and the XMM slew survey, eRASS1 and 2RXS give one survey epoch each (2RXS spans 1990–91). Each series keeps its own band unless you convert them; the Γ = 2 conversion ignores absorption, so soft-band points of absorbed sources stay too low. Open markers are flagged as saturated or piled up in the CSC. Swift-XRT light curves are not included because no browser-accessible per-observation service exists.",
     sdssTitle: "Optical spectrum (SDSS / BOSS / DESI)", spWhich: "Spectrum", spSmooth: "Smoothing", spRest: "Rest frame",
     spLines: "Line markers", spModel: "Pipeline model", spSearching: "Searching SDSS, BOSS and DESI spectra (NOIRLab SPARCL)…",
     spLoading: "Loading spectrum…", spNone: "No SDSS, BOSS or DESI spectrum within 3″ of this position.",
@@ -408,6 +438,17 @@ const I18N = {
     fxTitle: "X-ray katalog akıları", frTitle: "Radyo spektrumu",
     fluxPlotNote: "X-ray noktaları, her kataloğun enerji bandı boyunca çizilen bant akılarıdır (INTEGRAL için 20–40 keV'de 1 mCrab = 7,57×10⁻¹² erg/s/cm² kullanıldı); bantlar farklı olduğu için değerler doğrudan karşılaştırılamaz. Radyo uyumu, çizilen noktalara ağırlıklı S ∝ ν^α kuvvet yasasıdır; kataloglar çözünürlük ve gözlem dönemi bakımından farklı olduğundan değişken veya genişlemiş kaynaklarda saçılma olabilir.",
     noFluxes: "Çizilecek katalog akısı yok.", alphaFit: (a, e) => `α = ${a} ± ${e}`,
+    extraLabels: {pi: "PI", title: "Teklif başlığı", detector: "Dedektör", grating: "Izgara", instrument: "Alet", type: "Tür", ScW: "ScW"},
+    dlScript: "Veri indirme betiği", dlMission: "Bu uydu için indirme betiği",
+    scriptHead: (s) => `${s} için HEASARC veri indirme betiği`,
+    scriptSkipped: "Bu uydular için indirme kuralı yok; HEASARC Browse'u veya uydunun arşivini kullanın:",
+    scriptNone: "Arşiv düzeni bilinen, kamuya açık gözlem yok.",
+    tlTitle: "Gözlem zaman çizelgesi",
+    tlNote: "Her işaret bir gözlem (boyut ∝ √pozlama); içi boş işaretler henüz özel. Üzerine gelince ObsID, pozlama, PI ve teklif başlığı görünür; yakınlaştırmak için sürükleyin.",
+    lcTitle: "X-ray ışık eğrisi (dönem başına katalog akıları)", lcCommon: "0.5–10 keV'e çevir (Γ = 2, soğurmasız)", lcLog: "Logaritmik akı",
+    lcLoading: "Akılar toplanıyor…", lcNone: "Bu konumda çok dönemli X-ray katalog akısı yok.",
+    lcInfo: (parts) => `Seri başına nokta: ${parts}.`, lcRatio: (r) => `maks/min ${r}`, lcSat: "doymuş veya pile-up",
+    lcNote: "Chandra noktaları Chandra Source Catalog 2.1'in gözlem başına akılarıdır (canlı sorgulanır); XMM-Newton noktaları 5XMM-DR15 yığılmış kataloğundan ve XMM slew taramasından gelir; eRASS1 ve 2RXS birer tarama dönemi verir (2RXS 1990–91'i kapsar). Siz çevirmedikçe her seri kendi bandında kalır; Γ = 2 çevirisi soğurmayı yok sayar, bu yüzden soğurulmuş kaynaklarda yumuşak bant noktaları düşük kalır. İçi boş işaretler CSC'de doymuş veya pile-up olarak işaretlenmiştir. Tarayıcıdan erişilebilen gözlem başına bir servis olmadığı için Swift-XRT ışık eğrileri dahil değildir.",
     sdssTitle: "Optik spektrum (SDSS / BOSS / DESI)", spWhich: "Spektrum", spSmooth: "Yumuşatma", spRest: "Durgun çerçeve",
     spLines: "Çizgi işaretleri", spModel: "Boru hattı modeli", spSearching: "SDSS, BOSS ve DESI spektrumları aranıyor (NOIRLab SPARCL)…",
     spLoading: "Spektrum yükleniyor…", spNone: "Bu konumda (3″ içinde) SDSS, BOSS veya DESI spektrumu yok.",
@@ -512,6 +553,8 @@ function setLang(l) {
   renderCatalogs();
   scheduleFluxPlots();
   if (state.xr && state.xr.xc) { fillCutSelects(); drawXr(); }
+  drawTimeline();
+  drawLightcurve();
 }
 
 if (window.self !== window.top) {
@@ -753,10 +796,12 @@ async function queryCatalog(c, ra, dec) {
   return {cat: c, hits, covered: catCoverage(c, ra, dec)};
 }
 
-function parseVizierTsv(txt) {
-  const lines = txt.split("\n").filter((l) => l && !l.startsWith("#"));
-  if (lines.length < 3) return [];
+// Returns null when the reply is not the expected TSV (one mirror sometimes answers with a VOTable dump).
+function parseVizierTsv(txt, need) {
+  const lines = txt.split("\n").filter((l) => l.trim() && !l.startsWith("#"));
+  if (!lines.length) return [];
   const head = lines[0].split("\t").map((h) => h.trim());
+  if (!need.every((h) => head.includes(h)) || lines.length < 3) return null;
   return lines.slice(3).map((l) => {
     const v = l.split("\t");
     return Object.fromEntries(head.map((h, i) => [h, (v[i] || "").trim()]));
@@ -773,9 +818,17 @@ async function queryVizier(c, ra, dec) {
     if (!r.ok) throw new Error("HTTP " + r.status);
     const txt = await r.text();
     if (!txt.includes("#")) throw new Error("not VizieR");
-    return parseVizierTsv(txt);
+    const rows = parseVizierTsv(txt, ["_r", c.flux]);
+    if (!rows) throw new Error("unexpected VizieR format");
+    return rows;
   };
-  const rows = await Promise.any(VIZIER_MIRRORS.map(ask)).catch(() => { throw new Error("VizieR unreachable"); });
+  // prefer the first mirror that returns rows; report "no source" only if every mirror that answered was empty
+  const tries = VIZIER_MIRRORS.map(ask);
+  const rows = await Promise.any(tries.map((p) => p.then((x) => (x.length ? x : Promise.reject(new Error("empty")))))).catch(async () => {
+    const settled = await Promise.allSettled(tries);
+    if (settled.some((s) => s.status === "fulfilled")) return [];
+    throw new Error("VizieR unreachable");
+  });
   const scale = c.scale || 1, seen = new Set(), hits = [];
   for (const r of rows) {
     if (seen.has(r[c.name])) continue;
@@ -944,13 +997,17 @@ function toggleDetail(key) {
       const id = o.link ? `<a href="${esc(o.link)}" target="_blank" rel="noopener">${esc(o.id)}</a>` : esc(o.id);
       return `<tr><td>${id}</td><td>${esc(o.name)}</td><td>${esc(o.date || "—")}</td>
         <td class="num">${fmt(o.exposure_ks, 2)}</td><td class="num">${fmt(o.offset_arcmin, 2)}</td><td>${badge}</td>
-        ${extraKeys.map((k) => `<td>${esc((o.extra || {})[k] ?? "")}</td>`).join("")}</tr>`;
+        ${extraKeys.map((k) => `<td${k === "title" ? ' class="wrap"' : ""}>${esc((o.extra || {})[k] ?? "")}</td>`).join("")}</tr>`;
     }).join("");
-    dt.firstElementChild.innerHTML = `<div class="tablewrap"><table>
+    const labels = t("extraLabels");
+    const scriptBtn = DATA_DIRS[key] ? `<button type="button" class="mscript" data-key="${key}">${t("dlMission")}</button>` : "";
+    dt.firstElementChild.innerHTML = `${scriptBtn}<div class="tablewrap"><table>
       <thead><tr><th>${t("dId")}</th><th>${t("dTarget")}</th><th>${t("dDate")}</th><th class="num">${t("dExpo")}</th>
-      <th class="num">${t("dOff")}</th><th>${t("dStatus")}</th>${extraKeys.map((k) => `<th>${esc(k)}</th>`).join("")}</tr></thead>
+      <th class="num">${t("dOff")}</th><th>${t("dStatus")}</th>${extraKeys.map((k) => `<th>${esc(labels[k] || k)}</th>`).join("")}</tr></thead>
       <tbody>${rows}</tbody></table></div>
       ${obs.length > LIM ? `<p class="muted">${t("firstN")(LIM, fmtInt(obs.length))}</p>` : ""}`;
+    const btn = dt.querySelector(".mscript");
+    if (btn) btn.addEventListener("click", () => downloadScript([key]));
     dt.dataset.filled = "1";
   }
   dt.classList.toggle("hidden", !open);
@@ -979,6 +1036,7 @@ function renderTotal() {
     <div><div class="n">${fmt(expo / 1000, 2)}</div><div class="l">${t("totExpo")}</div></div>
     ${pending ? `<div><div class="n"><span class="spin"></span></div><div class="l">${t("pending")(pending)}</div></div>` : ""}`;
   $("csv").disabled = !!pending || total === 0;
+  $("dlScript").disabled = !!pending || total === 0;
 }
 
 async function runMission(key, sid) {
@@ -1486,6 +1544,7 @@ async function runCatalogs(sid) {
     scheduleFluxPlots();
   }));
   if (sid === searchSeq && state.xr && state.xr.xc) drawXr();
+  if (sid === searchSeq && state.lc) drawLightcurve();
 }
 
 // ---------------------------------------------------------------- HiPS pixel cutouts (HEALPix nested, read in the browser)
@@ -1966,6 +2025,259 @@ async function drawFluxPlots() {
   else $("frPlot").innerHTML = `<p class="muted">${esc(t("noFluxes"))}</p>`;
 }
 
+// ---------------------------------------------------------------- data download script (HEASARC FTP layout)
+const FTP = "https://heasarc.gsfc.nasa.gov/FTP";
+const yearMonth = (mjd) => (mjd == null ? null : mjdToDate(mjd).slice(0, 7).replace("-", "_"));
+// Directory of one observation; rules checked against the HEASARC datalink service for random ObsIDs.
+const DATA_DIRS = {
+  chandra: (o) => `${FTP}/chandra/data/byobsid/${o.id.slice(-1)}/${o.id}/`,
+  xmm: (o) => `${FTP}/xmm/data/rev0/${o.id}/`,
+  swift: (o) => o.mjd != null && `${FTP}/swift/data/obs/${yearMonth(o.mjd)}/${o.id}/`,
+  nustar: (o) => `${FTP}/nustar/data/obs/${o.id.slice(1, 3)}/${o.id[0]}/${o.id}/`,
+  nicer: (o) => o.mjd != null && `${FTP}/nicer/data/obs/${yearMonth(o.mjd)}/${o.id}/`,
+  suzaku: (o) => `${FTP}/suzaku/data/obs/${o.id[0]}/${o.id}/`,
+  xrism: (o) => `${FTP}/xrism/data/obs/${o.id[0]}/${o.id}/`,
+  ixpe: (o) => `${FTP}/ixpe/data/obs/${o.id.slice(0, 2)}/${o.id}/`,
+  hitomi: (o) => `${FTP}/hitomi/data/obs/${o.id[0]}/${o.id}/`,
+  asca: (o) => `${FTP}/asca/data/rev2/${o.id}/`,
+  rosat: (o) => {
+    const s = o.id.toLowerCase(), inst = s.startsWith("rp") ? "pspc" : s.startsWith("rh") ? "hri" : null;
+    return inst && `${FTP}/rosat/data/${inst}/processed_data/${String(Math.floor(+s.slice(2, 8) / 100000) * 100000).padStart(6, "0")}/${s}/`;
+  },
+  // RXTE folders sometimes carry a letter suffix, so fetch the proposal folder filtered to this ObsID
+  rxte: (o) => {
+    const p = o.id.split("-")[0];
+    if (!/^\d{5}$/.test(p)) return null;
+    const ao = p[0] === "9" ? 9 + +p[1] : +p[0];
+    return {url: `${FTP}/xte/data/archive/AO${ao}/P${p}/`, regex: `/P${p}/${o.id.replace(/[.]/g, "\\.")}[A-Z]?/`};
+  },
+};
+
+function scriptLine(dir, mission) {
+  const d = typeof dir === "string" ? {url: dir} : dir;
+  const cut = new URL(d.url).pathname.split("/").filter(Boolean).length - (d.regex ? 0 : 1);
+  return d.regex ? `getx ${d.url} ${cut} ${mission} '${d.regex}'` : `get ${d.url} ${cut} ${mission}`;
+}
+
+function downloadScript(keys) {
+  if (!state) return;
+  const src = state.src, name = src.main_id || src.query;
+  const lines = ["#!/usr/bin/env bash", `# ${t("scriptHead")(name)}`,
+    `# RA ${src.ra.toFixed(5)}  Dec ${src.dec.toFixed(5)}  ·  ${new Date().toISOString().slice(0, 10)}  ·  X-ray Archive Finder`,
+    "# Needs wget (macOS: brew install wget). Data go to ./<mission>/<obsid>/; re-running resumes and skips finished files.",
+    "# Only public observations are listed; edit or delete lines to choose what to fetch.", "set -u",
+    "OPTS=(-q -nH --no-check-certificate -r -l0 -c -N -np -R 'index*' -erobots=off --retr-symlinks)",
+    'get()  { wget "${OPTS[@]}" --cut-dirs="$2" -P "$3" "$1" && echo "ok    $1" || echo "FAIL  $1"; }',
+    'getx() { wget "${OPTS[@]}" --cut-dirs="$2" -P "$3" --accept-regex "$4" "$1" && echo "ok    $1 ($4)" || echo "FAIL  $1 ($4)"; }', ""];
+  const skipped = [];
+  let n = 0;
+  for (const key of keys) {
+    const res = state.results[key];
+    if (!res || res.error) continue;
+    const obs = res.observations.filter((o) => o.done && !o.proprietary);
+    if (!obs.length) continue;
+    const rule = DATA_DIRS[key];
+    if (!rule) { skipped.push(`${res.label} (${obs.length})`); continue; }
+    const body = obs.map((o) => rule(o)).filter(Boolean).map((d) => scriptLine(d, key));
+    if (!body.length) continue;
+    lines.push(`# ${res.label}: ${body.length}`, ...body, "");
+    n += body.length;
+  }
+  if (skipped.length) lines.push(`# ${t("scriptSkipped")}`, ...skipped.map((s) => `#   ${s}`), "#   https://heasarc.gsfc.nasa.gov/db-perl/W3Browse/w3browse.pl", "");
+  if (!n) lines.push(`echo "${t("scriptNone")}"`);
+  saveText(`xray_data_${name.replace(/[^\w.+-]+/g, "_")}.sh`, lines.join("\n") + "\n");
+}
+
+// ---------------------------------------------------------------- observation timeline
+async function drawTimeline() {
+  if (!state) return;
+  const done = MISSIONS.every((m) => state.results[m.key]);
+  if (!done) return;
+  let P;
+  try { P = await loadPlotly(); } catch (e) { return; }
+  const traces = [];
+  const order = MISSIONS.filter((m) => { const r = state.results[m.key]; return r && !r.error && r.observations.some((o) => o.mjd != null); });
+  order.forEach((m) => {
+    const r = state.results[m.key], idx = MISSIONS.indexOf(m), color = COLORS[idx % COLORS.length];
+    const obs = r.observations.filter((o) => o.mjd != null && o.done);
+    const mk = (list, open) => ({type: "scatter", mode: "markers", name: m.label, showlegend: false, x: list.map((o) => mjdToIso(o.mjd)),
+      y: list.map(() => m.label), customdata: list.map((o) => [o.id, fmt(o.exposure_ks, 1), fmt(o.offset_arcmin, 1),
+        (o.extra && o.extra.pi) || "—", ((o.extra && o.extra.title) || "").slice(0, 80)]),
+      marker: {color: open ? "rgba(0,0,0,0)" : color, line: {color, width: 1.5}, opacity: 0.85,
+        size: list.map((o) => Math.min(22, 5 + 2.2 * Math.sqrt(Math.max(o.exposure_ks || 0, 0))))},
+      hovertemplate: `<b>${esc(m.label)}</b> %{customdata[0]}<br>%{x|%Y-%m-%d}<br>%{customdata[1]} ks · %{customdata[2]}′<br>PI %{customdata[3]}<br>%{customdata[4]}<extra></extra>`});
+    const pub = obs.filter((o) => !o.proprietary), prop = obs.filter((o) => o.proprietary);
+    if (pub.length) traces.push(mk(pub, false));
+    if (prop.length) traces.push(mk(prop, true));
+  });
+  if (!traces.length) { P.purge("tlPlot"); $("tlPlot").innerHTML = ""; return; }
+  const layout = plotTheme({margin: {l: 120, r: 16, t: 10, b: 40}, hovermode: "closest"});
+  layout.xaxis = Object.assign(layout.xaxis, {type: "date"});
+  layout.yaxis = Object.assign(layout.yaxis, {type: "category", categoryorder: "array", categoryarray: order.map((m) => m.label).reverse()});
+  $("tlPlot").style.height = Math.max(200, 60 + 34 * order.length) + "px";
+  await P.react("tlPlot", traces, layout, PLOT_CONFIG);
+}
+
+const mjdToIso = (m) => new Date((m - 40587) * 86400000).toISOString();
+
+// ---------------------------------------------------------------- X-ray light curve
+const CSC_TAP = "https://cda.cfa.harvard.edu/csc21tap/sync";
+const RASS_EPOCH = [48102, 48281];
+const LC_BANDS = {csc: [0.5, 7], xmmstack: [0.2, 12], xmmslew: [0.2, 12], erass1: [0.2, 2.3], rxs2: [0.1, 2.4]};
+const LC_STYLE = {csc: ["Chandra CSC 2.1", "#d62728", "circle"], xmmstack: ["XMM-Newton pointed", "#2ca02c", "square"],
+  xmmslew: ["XMM-Newton slew", "#17becf", "triangle-up"], erass1: ["eRASS1", "#9467bd", "diamond"], rxs2: ["ROSAT 2RXS", "#8c564b", "star"]};
+let lcObsCache = null;
+
+function parseVotable(txt) {
+  const doc = new DOMParser().parseFromString(txt, "text/xml");
+  const info = [...doc.getElementsByTagName("INFO")].find((i) => i.getAttribute("name") === "QUERY_STATUS");
+  if (info && info.getAttribute("value") === "ERROR") throw new Error("CSC: " + (info.textContent || "query error").trim());
+  const fields = [...doc.getElementsByTagName("FIELD")].map((f) => f.getAttribute("name"));
+  return [...doc.getElementsByTagName("TR")].map((tr) => {
+    const td = [...tr.getElementsByTagName("TD")].map((x) => x.textContent.trim());
+    return Object.fromEntries(fields.map((f, i) => [f, td[i]]));
+  });
+}
+
+async function cscLightcurve(ra, dec) {
+  const r = 5 / 3600, dra = r / Math.max(Math.cos(dec * D2R), 1e-3);
+  const lo = ra - dra, hi = ra + dra;
+  const raCond = lo < 0 ? `(m.ra >= ${(lo + 360).toFixed(6)} OR m.ra <= ${hi.toFixed(6)})`
+    : hi >= 360 ? `(m.ra >= ${lo.toFixed(6)} OR m.ra <= ${(hi - 360).toFixed(6)})` : `m.ra BETWEEN ${lo.toFixed(6)} AND ${hi.toFixed(6)}`;
+  // CSC TAP has no ADQL geometry and only parses implicit joins
+  const q = "SELECT m.name, m.ra, m.dec, o.obsid, o.obi, o.gti_mjd_obs, o.flux_aper_b, o.flux_aper_lolim_b, o.flux_aper_hilim_b, " +
+    "o.instrument, o.sat_src_flag, o.pileup_warning FROM csc21.master_source m, csc21.master_stack_assoc a, " +
+    "csc21.stack_observation_assoc s, csc21.observation_source o WHERE " + raCond +
+    ` AND m.dec BETWEEN ${(dec - r).toFixed(6)} AND ${(dec + r).toFixed(6)} AND m.name = a.name AND a.detect_stack_id = s.detect_stack_id` +
+    " AND a.region_id = s.region_id AND o.obsid = s.obsid AND o.obi = s.obi AND o.region_id = s.region_id";
+  const url = `${CSC_TAP}?${new URLSearchParams({REQUEST: "doQuery", LANG: "ADQL", QUERY: q})}`;
+  const resp = await fetchTimeout(url, 60000);
+  if (!resp.ok) throw new Error("CSC HTTP " + resp.status);
+  const rows = parseVotable(await resp.text());
+  if (!rows.length) return [];
+  // keep the master source nearest to the position
+  const best = rows.map((x) => [x.name, sepDeg(ra, dec, +x.ra, +x.dec)]).sort((a, b) => a[1] - b[1])[0][0];
+  const seen = new Set();
+  return rows.filter((x) => x.name === best && x.flux_aper_b !== "").map((x) => {
+    const f = +x.flux_aper_b, loF = +x.flux_aper_lolim_b, hiF = +x.flux_aper_hilim_b, pile = +x.pileup_warning;
+    return {mjd: +x.gti_mjd_obs, flux: f, eneg: Number.isFinite(loF) ? f - loF : null, epos: Number.isFinite(hiF) ? hiF - f : null,
+      id: `${x.obsid}${x.obi !== "0" ? "." + x.obi : ""}`, flag: x.sat_src_flag === "T" || (pile > 0.1 && pile < 1e300), name: best};
+  }).filter((p) => { const k = p.id; if (seen.has(k)) return false; seen.add(k); return Number.isFinite(p.mjd); });
+}
+
+async function lcStatic(key, ra, dec) {
+  const lc = (CATMAN.lightcurves || []).find((x) => x.key === key);
+  if (!lc) return [];
+  if (!lc.cellSet) lc.cellSet = new Set(lc.cells);
+  const r = lc.match / 3600;
+  const idxs = cellsForCircle(ra, dec, r).filter((i) => lc.cellSet.has(i));
+  const cells = await Promise.all(idxs.map((i) => loadCell("cat/lc/" + key, i)));
+  if (lc.kind === "points") {
+    const pts = [];
+    for (const rows of cells) for (const row of rows) {
+      if (sepDeg(ra, dec, row[0], row[1]) * 3600 <= lc.match) pts.push({mjd: row[2], flux: row[3], eneg: row[4], epos: row[4], id: ""});
+    }
+    return pts;
+  }
+  let best = null, bestSep = Infinity;
+  for (const rows of cells) for (const row of rows) {
+    const s = sepDeg(ra, dec, row[0], row[1]) * 3600;
+    if (s <= lc.match && s < bestSep) { best = row; bestSep = s; }
+  }
+  if (!best) return [];
+  if (!lcObsCache) lcObsCache = getJSON(DATA + "cat/lc/xmmstack/obs.json").catch((e) => { lcObsCache = null; throw e; });
+  const obs = await lcObsCache;
+  return best[2].map(([i, f, e]) => ({mjd: obs.mjd[i], flux: f, eneg: e, epos: e, id: obs.ids[i]}));
+}
+
+function catEpochPoints(key) {
+  const res = state.cats && state.cats[key];
+  if (!res || !res.hits || !res.hits.length || res.hits[0].flux == null) return [];
+  const h = res.hits[0];
+  if (key === "erass1") {
+    const k = res.cat.params.indexOf("MJD"), mjd = k >= 0 ? h.params[k] : null;
+    return mjd ? [{mjd, flux: h.flux, eneg: h.eneg, epos: h.epos, id: h.name}] : [];
+  }
+  return [{mjd: (RASS_EPOCH[0] + RASS_EPOCH[1]) / 2, flux: h.flux, eneg: h.eneg, epos: h.epos, id: h.name, span: RASS_EPOCH}];
+}
+
+async function runLightcurve(sid) {
+  $("lc").classList.remove("hidden");
+  $("lcStatus").innerHTML = `<span class="spin"></span> ${esc(t("lcLoading"))}`;
+  state.lc = null;
+  const {ra, dec} = state.src;
+  const [csc, xs, sl] = await Promise.all([cscLightcurve(ra, dec).catch((e) => ({error: e.message})),
+    lcStatic("xmmstack", ra, dec).catch((e) => ({error: e.message})), lcStatic("xmmslew", ra, dec).catch((e) => ({error: e.message}))]);
+  if (sid !== searchSeq) return;
+  state.lc = {csc, xmmstack: xs, xmmslew: sl};
+  $("lcStatus").textContent = [csc, xs, sl].filter((x) => x && x.error).map((x) => x.error).join(" · ");
+  drawLightcurve();
+}
+
+function lcSeries() {
+  const lc = state.lc || {};
+  const s = {csc: lc.csc, xmmstack: lc.xmmstack, xmmslew: lc.xmmslew, erass1: catEpochPoints("erass1"), rxs2: catEpochPoints("rxs2")};
+  const common = $("lcCommon").checked;
+  const out = {};
+  for (const [k, pts] of Object.entries(s)) {
+    if (!Array.isArray(pts) || !pts.length) continue;
+    const [e1, e2] = LC_BANDS[k], f = common ? Math.log(10 / 0.5) / Math.log(e2 / e1) : 1;
+    out[k] = pts.filter((p) => p.flux > 0).map((p) => Object.assign({}, p, {flux: p.flux * f, eneg: p.eneg != null ? p.eneg * f : null,
+      epos: p.epos != null ? p.epos * f : null})).sort((a, b) => a.mjd - b.mjd);
+  }
+  return out;
+}
+
+async function drawLightcurve() {
+  if (!state || !state.lc) return;
+  const series = lcSeries();
+  const keys = Object.keys(series).filter((k) => series[k].length);
+  if (!keys.length) {
+    try { (await loadPlotly()).purge("lcPlot"); } catch (e) { /* none */ }
+    $("lcPlot").innerHTML = `<p class="muted">${esc(t("lcNone"))}</p>`;
+    $("lcInfo").textContent = "";
+    return;
+  }
+  let P;
+  try { P = await loadPlotly(); } catch (e) { return; }
+  const common = $("lcCommon").checked, logY = $("lcLog").checked, traces = [];
+  for (const k of keys) {
+    const [label, color, sym] = LC_STYLE[k], band = common ? "0.5–10 keV" : `${LC_BANDS[k][0]}–${LC_BANDS[k][1]} keV`;
+    const pts = series[k];
+    const span = pts.map((p) => (p.span ? [(p.span[1] - p.span[0]) / 2] : [0]));
+    traces.push({type: "scatter", mode: "markers", name: `${label} (${band})`, x: pts.map((p) => mjdToIso(p.mjd)), y: pts.map((p) => p.flux),
+      error_y: {type: "data", symmetric: false, array: pts.map((p) => p.epos || 0), arrayminus: pts.map((p) => Math.min(p.eneg || 0, p.flux * 0.999)), thickness: 1, width: 2, color},
+      error_x: {type: "data", array: span.map((s) => s[0] * 86400000), thickness: 1, width: 0, color},
+      marker: {symbol: pts.map((p) => (p.flag ? sym + "-open" : sym)), size: 8, color, line: {color, width: 1.4}},
+      customdata: pts.map((p) => [p.id || "", p.flag ? t("lcSat") : "", p.mjd.toFixed(2)]),
+      hovertemplate: `<b>${esc(label)}</b> %{customdata[0]}<br>%{x|%Y-%m-%d} (MJD %{customdata[2]})<br>%{y:.3g} erg/s/cm² · ${esc(band)}<br>%{customdata[1]}<extra></extra>`});
+  }
+  const layout = plotTheme({showlegend: true, legend: {orientation: "h", y: -0.22}, margin: {l: 70, r: 16, t: 10, b: 80}, hovermode: "closest"});
+  // pad the time axis so a single epoch (or a tight cluster) is not zoomed to milliseconds
+  const all = keys.flatMap((k) => series[k].flatMap((p) => (p.span ? p.span : [p.mjd])));
+  const t0 = Math.min(...all), t1 = Math.max(...all), pad = Math.max(365, 0.05 * (t1 - t0));
+  layout.xaxis = Object.assign(layout.xaxis, {type: "date", range: [mjdToIso(t0 - pad), mjdToIso(t1 + pad)]});
+  layout.yaxis = Object.assign(layout.yaxis, {type: logY ? "log" : "linear", title: {text: "F (erg/s/cm²)"}, exponentformat: "power"});
+  await P.react("lcPlot", traces, layout, PLOT_CONFIG);
+  const parts = keys.map((k) => {
+    const f = series[k].map((p) => p.flux), r = f.length > 1 ? Math.max(...f) / Math.min(...f) : null;
+    return `${LC_STYLE[k][0]} ${f.length}${r ? " (" + t("lcRatio")(r.toFixed(1)) + ")" : ""}`;
+  });
+  $("lcInfo").textContent = t("lcInfo")(parts.join(", "));
+}
+
+function lightcurveCsv() {
+  if (!state || !state.lc) return;
+  const series = lcSeries(), common = $("lcCommon").checked;
+  const lines = ["series,band_keV,id,mjd,date,flux_erg_s_cm2,err_neg,err_pos,flag"];
+  for (const [k, pts] of Object.entries(series)) {
+    const band = common ? "0.5-10" : `${LC_BANDS[k][0]}-${LC_BANDS[k][1]}`;
+    pts.forEach((p) => lines.push([LC_STYLE[k][0], band, p.id || "", p.mjd, mjdToDate(p.mjd), p.flux, p.eneg ?? "", p.epos ?? "", p.flag ? "saturated/pileup" : ""]
+      .map((v) => (/[",]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : v)).join(",")));
+  }
+  saveText(`lightcurve_${(state.src.main_id || state.src.query).replace(/[^\w.+-]+/g, "_")}.csv`, lines.join("\n"));
+}
+
 // ---------------------------------------------------------------- CSV
 function downloadCsv() {
   const head = ["mission","obsid","target","date","mjd","exposure_ks","offset_arcmin","status","observed","proprietary","public_date","ra","dec"];
@@ -2184,7 +2496,7 @@ async function search(q) {
   if (fixed && !(radius > 0 && radius <= MAX_RADIUS)) { showStatus(t("radiusErr"), true); return; }
   syncUrl(q, radius);
   $("go").disabled = true;
-  ["source", "results", "images", "catalogs", "xr", "spec"].forEach((id) => $(id).classList.add("hidden"));
+  ["source", "results", "images", "catalogs", "xr", "spec", "lc"].forEach((id) => $(id).classList.add("hidden"));
   $("legend").innerHTML = "";
   showStatus(`<span class="spin"></span> ${esc(t("resolving")(q))}`);
   let src;
@@ -2206,7 +2518,7 @@ async function search(q) {
   runSurveys(sid);
   runSpectra(sid);
   await pool(MISSIONS.map((m) => m.key), 6, (k) => runMission(k, sid));
-  if (sid === searchSeq) { $("go").disabled = false; runXr(sid); }
+  if (sid === searchSeq) { $("go").disabled = false; drawTimeline(); runLightcurve(sid); runXr(sid); }
 }
 
 async function loadManifest() {
@@ -2236,6 +2548,9 @@ async function loadManifest() {
   initXrControls();
   ["spSel", "spBox", "spRest", "spLines", "spModel"].forEach((id) => $(id).addEventListener("change", drawSpectrum));
   $("spCsv").addEventListener("click", spectrumCsv);
+  $("dlScript").addEventListener("click", () => downloadScript(MISSIONS.map((m) => m.key)));
+  ["lcCommon", "lcLog"].forEach((id) => $(id).addEventListener("change", drawLightcurve));
+  $("lcCsv").addEventListener("click", lightcurveCsv);
   try {
     const [m] = await Promise.all([loadManifest(), loadCatManifest()]);
     MISSIONS = m.missions; SURVEYS = m.surveys;

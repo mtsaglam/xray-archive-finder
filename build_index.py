@@ -42,7 +42,8 @@ CATALOGS = [
     dict(key="erass1", label="eRASS1 (eROSITA)", kind="x", table="erass1main", band="0.2–2.3 keV",
          unit="erg/s/cm²", match=20, flux="b1_flux", err="b1_flux_error", poserr="error_radius",
          poserr_note="1σ",
-         params=[("rate c/s", "b1_count_rate"), ("ext″", "source_extent"), ("DET_LIKE", "b0_detect_likelihood")]),
+         params=[("rate c/s", "b1_count_rate"), ("ext″", "source_extent"), ("DET_LIKE", "b0_detect_likelihood"),
+                 ("MJD", "time")]),
     dict(key="rxs2", label="2RXS (ROSAT)", kind="x", table="rass2rxs", band="0.1–2.4 keV",
          unit="erg/s/cm²", match=40, flux="plaw_flux", rate_err=("count_rate", "count_rate_error"),
          params=[("rate c/s", "count_rate"), ("HR1", "hardness_ratio_1"), ("HR2", "hardness_ratio_2")]),
@@ -62,6 +63,16 @@ CATALOGS = [
          flux="int_flux_36_cm", err="int_flux_36_cm_error", noname=True, params=[]),
     dict(key="wenss", label="WENSS", kind="radio", table="wenss", band="325 MHz", unit="mJy", match=45,
          flux="int_flux_92_cm", err="flux_92_cm_error", noname=True, params=[]),
+]
+
+
+# Multi-epoch X-ray fluxes for light curves. "stack": per-observation fluxes of 5XMM sources, grouped per source;
+# "points": one row per detection with its own epoch.
+LIGHTCURVES = [
+    dict(key="xmmstack", label="XMM-Newton pointed (5XMM-DR15 stacked)", kind="stack", table="xmmstack",
+         band="0.2–12 keV", match=10),
+    dict(key="xmmslew", label="XMM-Newton slew survey", kind="points", table="xmmslewcln", band="0.2–12 keV",
+         match=20, cols=[("t", "time"), ("flux", "flux_b8"), ("err", "flux_b8_error")]),
 ]
 
 
@@ -105,6 +116,31 @@ def fetch_all(key, table, cols):
     for lo in range(-90, 90, 10):
         rows += fetch_rows(key, table, cols, lo, lo + 10)
     return rows
+
+
+def fetch_bands(key, table, cols):
+    """Like fetch_all, but yields one declination band at a time to keep memory low."""
+    for lo in range(-90, 90, 5):
+        yield fetch_rows(key, table, cols, lo, lo + 5)
+
+
+def fetch_row_chunks(key, table, cols, chunk=20000, workers=5):
+    """Yield a big table in "__row" ranges fetched in parallel (HEASARC returns ~0.5k rows/s per query)."""
+    total = archive.tap_query("SELECT COUNT(*) AS n FROM {}".format(table))[0]["n"]
+    last = archive.tap_query('SELECT MAX("__row") AS n FROM {}'.format(table))[0]["n"]
+    sel = ", ".join("{} AS {}".format(expr, alias) for alias, expr in cols)
+
+    def get(a):
+        return archive.tap_query('SELECT {}, ra, dec FROM {} WHERE "__row" >= {} AND "__row" < {}'.format(
+            sel, table, a, a + chunk))
+
+    got = 0
+    with ThreadPoolExecutor(max_workers=workers) as ex:
+        for rows in ex.map(get, range(1, int(last) + 1, chunk)):
+            got += len(rows)
+            yield rows
+    if got != total:
+        raise RuntimeError("{}: expected {} rows, got {}".format(key, total, got))
 
 
 def write_cells(directory, cells):
@@ -240,12 +276,59 @@ def build_catalog(c, out_dir):
     return info
 
 
+def build_lightcurve(lc, out_dir):
+    t0 = time.time()
+    cells, n = {}, 0
+    if lc["kind"] == "points":
+        for rows in fetch_bands(lc["key"], lc["table"], lc["cols"]):
+            for r in rows:
+                if r.get("ra") is None or r.get("dec") is None or r.get("flux") is None or r.get("t") is None:
+                    continue
+                cells.setdefault(cell_index(r["ra"], r["dec"]), []).append(
+                    [rnd(r["ra"], 5), rnd(r["dec"], 5), rnd(r["t"], 4), sig(r["flux"], 4), sig(r.get("err"), 3)])
+                n += 1
+        extra = {}
+    else:
+        # per-observation EPIC fluxes; epochs come from the XMM master table via an observation index
+        obs = archive.tap_query("SELECT obsid AS oid, time AS t FROM xmmmaster")
+        obs_mjd = {str(o["oid"]): o["t"] for o in obs if o["t"] is not None}
+        obs_ids, obs_index, sources = [], {}, {}
+        cols = [("sid", "srcid"), ("oid", "obsid"), ("flux", "ep_flux"), ("err", "ep_flux_error")]
+        for rows in fetch_row_chunks(lc["key"], lc["table"], cols):
+            for r in rows:
+                oid = str(r.get("oid"))
+                if r.get("ra") is None or r.get("flux") is None or oid not in obs_mjd:
+                    continue
+                if oid not in obs_index:
+                    obs_index[oid] = len(obs_ids)
+                    obs_ids.append(oid)
+                src = sources.get(r["sid"])
+                if src is None:
+                    src = sources[r["sid"]] = [rnd(r["ra"], 5), rnd(r["dec"], 5), []]
+                src[2].append([obs_index[oid], sig(r["flux"], 4), sig(r.get("err"), 3)])
+                n += 1
+        for src in sources.values():
+            cells.setdefault(cell_index(src[0], src[1]), []).append(src)
+        extra = dict(obs=dict(ids=obs_ids, mjd=[rnd(obs_mjd[o], 4) for o in obs_ids]))
+    lc_dir = os.path.join(out_dir, "data", "cat", "lc", lc["key"])
+    write_cells(lc_dir, cells)
+    if extra:
+        with open(os.path.join(lc_dir, "obs.json"), "w") as f:
+            json.dump(extra["obs"], f, separators=(",", ":"))
+    print("{:<28} {:>8} rows {:>6} cells {:6.1f}s".format(lc["label"], n, len(cells), time.time() - t0), flush=True)
+    info = {k: lc.get(k) for k in ("key", "label", "kind", "band", "match")}
+    info.update(rows=n, cells=sorted(cells))
+    return info
+
+
 def build_catalogs(out_dir):
     os.makedirs(os.path.join(out_dir, "data", "cat"), exist_ok=True)
     with ThreadPoolExecutor(max_workers=4) as ex:
+        lc_jobs = [ex.submit(build_lightcurve, lc, out_dir) for lc in LIGHTCURVES]
         catalogs = list(ex.map(lambda c: build_catalog(c, out_dir), CATALOGS))
+        lightcurves = [j.result() for j in lc_jobs]
     manifest = dict(updated=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
-                    cell_deg=CELL, n_ra=N_RA, n_dec=N_DEC, catalogs=catalogs)
+                    cell_deg=CELL, n_ra=N_RA, n_dec=N_DEC, catalogs=catalogs, lightcurves=lightcurves)
     with open(os.path.join(out_dir, "data", "cat", "manifest.json"), "w") as f:
         json.dump(manifest, f, separators=(",", ":"))
     print("catalogs: total rows", sum(c["rows"] for c in catalogs), flush=True)
@@ -260,6 +343,7 @@ def main(argv):
         return 1
     if not flags:
         flags = {"--observations", "--catalogs"}
+    archive.TIMEOUT = 180  # big paginated queries can be slow while several run in parallel
     if "--observations" in flags:
         build_observations(args[0])
     if "--catalogs" in flags:
